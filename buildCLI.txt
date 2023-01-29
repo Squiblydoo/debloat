@@ -1,0 +1,5 @@
+MacOS
+pyinstaller --onefile --noconsole --additional-hooks-dir=./hook --icon=debloat.icns debloat.py
+
+Windows
+pyinstaller --onefile  --noconsole  --additional-hooks-dir=./hook --icon=debloat.ico debloat.py
