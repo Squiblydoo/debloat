@@ -21,9 +21,10 @@ Foremost works best in instances where the junk bytes are null (0x00) and it str
 Pecheck has been developed over 14+ years and has some confusing commandline options. The option to remove bloated content is not the primary function of the script. Pecheck has to be combined with another tool in order to handle signed executables. In my experience, there are other times where pecheck can get confused and return an executable twice the size of the original bloated executable.
 
 ## How to build? 
-Follow the build commands appropriate to your platform. The main difference between build commands is the format of the icon. 
-MacOS
+Follow the build commands appropriate to your platform. The main difference between build commands is the format of the icon.
+<br>
+MacOS<br>
 `pyinstaller --onefile --noconsole --additional-hooks-dir=./hook --icon=debloat.icns debloat.py`
 
-Windows
+Windows<br>
 `pyinstaller --onefile  --noconsole  --additional-hooks-dir=./hook --icon=debloat.ico debloat.py`
