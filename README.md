@@ -22,3 +22,8 @@ Pecheck has been developed over 14+ years and has some confusing commandline opt
 
 ## How to build? 
 Follow the build commands appropriate to your platform. The main difference between build commands is the format of the icon. 
+MacOS
+`pyinstaller --onefile --noconsole --additional-hooks-dir=./hook --icon=debloat.icns debloat.py`
+
+Windows
+`pyinstaller --onefile  --noconsole  --additional-hooks-dir=./hook --icon=debloat.ico debloat.py`
