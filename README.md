@@ -3,6 +3,8 @@
 # Debloat
 Debloat is a GUI tool to remove excess garbage from bloated executables.
 
+By excess garbage, I mean 300 - 800MB of junk bytes added to a binary to keep it from going into a sandbox.
+
 Being built with Python, the code and logic is easily accessible for others to take the concepts and apply the concepts to their own tools. The program can be compiled for Windows, MacOS, Linux. The GUI removes any need for remembering commandline options and reading through CLI manuals: it is intended to be as simple as possible. The logic within the program handles the different use cases automatically.
 
 ## How to use?
