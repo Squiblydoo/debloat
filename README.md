@@ -7,6 +7,8 @@ By excess garbage, I mean 300 - 800MB of junk bytes added to a binary to keep it
 
 Being built with Python, the code and logic is easily accessible for others to take the concepts and apply the concepts to their own tools. The program can be compiled for Windows, MacOS, Linux. The GUI removes any need for remembering commandline options and reading through CLI manuals: it is intended to be as simple as possible. The logic within the program handles the different use cases automatically.
 
+Compiled binaries have already been included in the [Releases](https://github.com/Squiblydoo/debloat/releases/).
+
 ## How to use?
 Debloat is a GUI and intends to be as intuitive as possible.
 When launched, you can drag and drop bloated file onto the text bar and press the "Process file" button.
