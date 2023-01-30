@@ -13,6 +13,10 @@ Sound easy? It is!
 
 <img width="602" alt="Screenshot 2023-01-29 at 2 52 13 PM" src="https://user-images.githubusercontent.com/77356206/215352245-b37091ce-4d58-415c-a7ba-44a9c45bd6f1.png">
 
+## Does it always work?
+Not yet.
+My unscientific guess is that it should work for every 5 of 6 binaries. There are specific usecases I know where it does not work and I am working to implement solutions for those usecases. In situations where it does not work, it may remove too much content from the binary and the binary will return malformed.
+
 ## Why?
 There appear to be a limited number of tools to easily process bloated executables. The two tools I have seen the most are “foremost” which is intended for recovering binaries from a disk image and “pecheck”.
 
