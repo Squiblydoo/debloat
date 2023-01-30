@@ -11,6 +11,8 @@ When launched, you can drag and drop bloated file onto the text bar and press th
 Some technical information will be printed to the scrolling textbox and the file without bloat will be written to the directory the file was pulled from.
 Sound easy? It is!
 
+Running the program should debloat the binary in 30-40 second on average; as long as 120 seconds for more complicated obfuscation methods.
+
 <img width="602" alt="Screenshot 2023-01-29 at 2 52 13 PM" src="https://user-images.githubusercontent.com/77356206/215352245-b37091ce-4d58-415c-a7ba-44a9c45bd6f1.png">
 
 ## Does it always work?
@@ -20,9 +22,13 @@ My unscientific guess is that it should work for every 5 of 6 binaries. There ar
 ## Why?
 There appear to be a limited number of tools to easily process bloated executables. The two tools I have seen the most are “foremost” which is intended for recovering binaries from a disk image and “pecheck”.
 
-Foremost works best in instances where the junk bytes are null (0x00) and it struggles when the binary has a fake or real signature.
+Foremost works best in instances where the junk bytes are null (0x00) and it struggles when the binary has a fake or real signature. Its use in removing bloat from files is not its original purpose.
 
-Pecheck has been developed over 14+ years and has some confusing commandline options. The option to remove bloated content is not the primary function of the script. Pecheck has to be combined with another tool in order to handle signed executables. In my experience, there are other times where pecheck can get confused and return an executable twice the size of the original bloated executable.
+Pecheck has been developed over 14+ years and has some confusing commandline options. The option to remove bloated content is not the primary function of the script. Pecheck has to be combined with another tool in order to handle signed executables. In my experience, there are other times where pecheck can get confused and return an executable twice the size of the original bloated executable. All these factors seem OK if you are handling a small number of binaries, but as the number of binaries and methods increase, a tool specific to removing bloat is needed.
+
+There are good solid manual methods to remove bloat from binaries, but these methods can be tedious and not all analysts have the skills to do this. This tool removes the burden of needing to know how to manually remove bloat. Additionally, it allows for better scale. The principles used in the script allow allow for better scale if automation is desired.\*
+
+\* Note: If automation is desired, I recommend re-writing these concepts in C/C++ and not Python.
 
 ## How to build? 
 Follow the build commands appropriate to your platform. The main difference between build commands is the format of the icon.
