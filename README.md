@@ -28,3 +28,7 @@ MacOS<br>
 
 Windows<br>
 `pyinstaller --onefile  --noconsole  --additional-hooks-dir=./hook --icon=debloat.ico debloat.py`
+
+Linux<br> 
+`~/.local/bin/pyinstaller --onefile --noconsole --icon=debloat.ico --additional-hooks-dir=./hook --add-binary "/home/redacted/.local/lib/python3.10/site-packages/:." debloat.py`
+- I'm not sure why the same hook didn't work on Linux and pointing to the site-packages directory is not preferred. For some unknown reason, it would not find the binary if I pointed to the specific tkinterdnd2 or tkdnd directories.
