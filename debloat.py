@@ -5,7 +5,6 @@ from pathlib import Path
 import tkinter.scrolledtext as st
 import time
 import re
-from sys import platform
 
 
 def main():
@@ -131,15 +130,7 @@ def main():
 
     root = TkinterDnD.Tk()
     root.title("Debloat")
-    if platform == "linux" or platform == "linux2":
-        root.iconbitmap(".\debloat.icns")
-    elif platform == "darwin":
-        root.iconbitmap(".\debloat.icns")
-    elif platform == "win32":
-        #root.iconbitmap(".\\debloat.ico")
-        print("Windows icon not working right now for some reason.")
-    else:
-        print("Unsupoorted platform for icon")
+    ## I removed the Tkinter Icon since it didn't work on most platforms and just caused more problems than necessary.
     root.geometry("600x600")
 
     #Label and PathBox
