@@ -3,3 +3,6 @@ pyinstaller --onefile --noconsole --additional-hooks-dir=./hook --icon=debloat.i
 
 Windows
 pyinstaller --onefile  --noconsole  --additional-hooks-dir=./hook --icon=debloat.ico debloat.py
+
+Linux
+~/.local/bin/pyinstaller --onefile --noconsole --icon=debloat.ico --additional-hooks-dir=./hook --add-binary "/home/redacted/.local/lib/python3.10/site-packages/:." debloat.p

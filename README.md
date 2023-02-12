@@ -23,12 +23,36 @@ Running the program should debloat the binary in 30-40 second on average; as lon
 Not yet.
 My unscientific guess is that it should work for every 5 of 6 binaries. There are specific usecases I know where it does not work and I am working to implement solutions for those usecases. In situations where it does not work, it may remove too much content from the binary and the binary will return malformed.
 
+## Use Cases (Images from [Malcat](https://malcat.fr/))
+### Full support
+- [x] Bloat appended to the end of a Signed PE.<br>
+In the image below, the bloat has been appended to the end of the executable. <br>
+![Screenshot 2023-02-11 at 3 32 36 PM](https://user-images.githubusercontent.com/77356206/218279963-00780b59-8227-47dd-a0af-41096f6ae17b.png)
+
+- [X] Signed executable packed with UPX.<br>
+In the image below, the bloat has been appended to the executable after packing. <br>
+![Screenshot 2023-02-11 at 3 44 10 PM](https://user-images.githubusercontent.com/77356206/218280433-6dbcf51a-68c8-48e1-a89a-ad0b818a0afc.png)
+
+- [X] Signed executable includes bloat in the .rsrc section of the PE.<br>
+In the image below, the bloat is identified as in the .rsrc section and is removed from the PE.<br>
+![Screenshot 2023-02-11 at 3 35 21 PM](https://user-images.githubusercontent.com/77356206/218280086-7cd548f8-e16b-4290-9283-a8a848de1419.png)
+
+### Partial Support
+- [ ] Some cases where bloat is added inside a PE Section.<br>
+In the imave below, the bloat has been included in a PE section named [0]. <br>
+![Screenshot 2023-02-11 at 3 26 52 PM](https://user-images.githubusercontent.com/77356206/218279753-ed2c9102-482a-4639-aeb1-df8efc9c4e2e.png)
+
+- [ ] Some packer detection
+
+### Other use cases
+There are use cases where the tool does not work. However, I plan to solve for them before publishing too much about them.
+
 ## Why?
 There appear to be a limited number of tools to easily process bloated executables. The two tools I have seen the most are “foremost” which is intended for recovering binaries from a disk image and “pecheck”.
 
-Foremost works best in instances where the junk bytes are null (0x00) and it struggles when the binary has a fake or real signature. Its use in removing bloat from files is not its original purpose.
+[Foremost](https://www.kali.org/tools/foremost/) works best in instances where the junk bytes are null (0x00) and it struggles when the binary has a fake or real signature. Its use in removing bloat from files is not its original purpose.
 
-Pecheck has been developed over 14+ years and has some confusing commandline options. The option to remove bloated content is not the primary function of the script. Pecheck has to be combined with another tool in order to handle signed executables. In my experience, there are other times where pecheck can get confused and return an executable twice the size of the original bloated executable. All these factors seem OK if you are handling a small number of binaries, but as the number of binaries and methods increase, a tool specific to removing bloat is needed.
+[Pecheck](https://github.com/DidierStevens/DidierStevensSuite/blob/master/pecheck.py) has been developed over 14+ years and has some confusing commandline options. The option to remove bloated content is not the primary function of the script. Pecheck has to be combined with another tool ([disitool](https://blog.didierstevens.com/programs/disitool/)) in order to handle signed executables. In my experience, there are other times where pecheck can get confused and return an executable twice the size of the original bloated executable. All these factors seem OK if you are handling a small number of binaries, but as the number of binaries and methods increase, a tool specific to removing bloat is needed.
 
 There are good solid manual methods to remove bloat from binaries, but these methods can be tedious and not all analysts have the skills to do this. This tool removes the burden of needing to know how to manually remove bloat. Additionally, it allows for better scale. The principles used in the script allow allow for better scale if automation is desired.\*
 
@@ -46,3 +70,6 @@ Windows<br>
 Linux<br> 
 `~/.local/bin/pyinstaller --onefile --noconsole --icon=debloat.ico --additional-hooks-dir=./hook --add-binary "/home/redacted/.local/lib/python3.10/site-packages/:." debloat.py`
 - I'm not sure why the same hook didn't work on Linux and pointing to the site-packages directory is not preferred. For some unknown reason, it would not find the binary if I pointed to the specific tkinterdnd2 or tkdnd directories.
+
+## Where is this project going next?
+The current plan is to build in CLI functionality to handle batch jobs. At that stage, it will process all the files in a directory and output a report.
