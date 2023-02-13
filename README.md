@@ -39,7 +39,7 @@ In the image below, the bloat is identified as in the .rsrc section and is remov
 
 ### Partial Support
 - [ ] Some cases where bloat is added inside a PE Section.<br>
-In the imave below, the bloat has been included in a PE section named [0]. <br>
+In the image below, the bloat has been included in a PE section named [0]. <br>
 ![Screenshot 2023-02-11 at 3 26 52 PM](https://user-images.githubusercontent.com/77356206/218279753-ed2c9102-482a-4639-aeb1-df8efc9c4e2e.png)
 
 - [ ] Some packer detection
