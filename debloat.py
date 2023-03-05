@@ -155,6 +155,7 @@ class main_window(TkinterDnD.Tk):
                 lastSection = processor.findLastSection(pe)
                 endOfRealData = lastSection.PointerToRawData + lastSection.SizeOfRawData 
         
+
         ## Handle bloated sections
         ## TODO: break up into functions
         else:
@@ -170,33 +171,42 @@ class main_window(TkinterDnD.Tk):
                 self.outputScrollboxHandler("Size of section: " + NumberOfBytesHumanRepresentation(section.SizeOfRawData) +".\n")
 
 
-                if sectionEntropy < 0.09 and sectionEntropy > 0.01 and section.SizeOfRawData > 100000:
+                ## The use cases covered by this section are at the end of the binary.
+                ## In my experience, the bloated sections are usually at the end unless they are bloat from .NET Resources.
+                if sectionEntropy < 0.09 and section.SizeOfRawData > 100000:
                     self.outputScrollboxHandler("Entropy of section is exteremely low.\n This is indicative of a bloated section.\n Removing bloated section...\n")
                     
-                    # Using method provided by Malcat. Currently works for last section with null bytes.
-                    # 1) We calculate very simply where the end of the section is.
-                    # 2) We get the data from the final section and store it as "SectionData"
-                    # 3) We reverse the section data and presumably the beginning of the section is not junk
-                    # 4) We use regex to make a matching group based on null bytes. That match is calculated by 
-                    #       subtracting the length of the match against the size of the revertedSectionData.
-                    # 5) We then calculate a simple number of bytes to remove 
+                    #Get the size of the section.
                     sectionEnd = section.PointerToRawData + section.SizeOfRawData
-                    sectionData = pe.write()[section.PointerToRawData:sectionEnd]
-                    revertedSectionData = sectionData[::-1]
-                    junkMatch = re.search(rb"[^\x00]", revertedSectionData)
-                    if not junkMatch:
-                        delta_last_non_zero = len(revertedSectionData)
-                    else:
-                        delta_last_non_zero = len(revertedSectionData) - junkMatch.end(0)
-                    
-                    sectionBytesToRemove = beginningFileSize - (section.PointerToRawData + delta_last_non_zero + 1)
 
-                    ## Fix last section header
+                    #If the entropy is simply 0.00, there is no data to be missed, we won't waste CPU and just drop the whole thing.
+                    if sectionEntropy == 0.00:
+                        ## We won't waste any time. We will just drop the whole thing. Though to play it safe, we will
+                        ## leave 100 bytes in the section. And thus mark the end of the binary as the beginning of the last
+                        ## section + 100.
+                        sectionBytesToRemove = section.SizeOfRawData - 100
+                        endOfRealData = section.PointerToRawData + 100
+                    
+                    ## If the section has low entropy we'll try to determine how much is junk.
+                    else:
+                        sectionData = pe.write()[section.PointerToRawData:sectionEnd]
+                        sectionEnd = section.PointerToRawData + section.SizeOfRawData
+                        sectionData = pe.write()[section.PointerToRawData:sectionEnd]
+                        revertedSectionData = sectionData[::-1]
+                        junkMatch = re.search(rb"(.)\1{100,}", revertedSectionData)
+                        if not junkMatch:
+                            delta_last_non_zero = len(revertedSectionData)
+                        else:
+                            delta_last_non_zero = len(revertedSectionData) - junkMatch.end(0)
+                        
+                        sectionBytesToRemove = beginningFileSize - (section.PointerToRawData + delta_last_non_zero + 1)
+                        endOfRealData = section.PointerToRawData + delta_last_non_zero + 1
+
+                    ## Fix last section header, SizeOfRawData, SizeOfImage.
                     section.Misc_VirtualSize -= sectionBytesToRemove
                     section.SizeOfRawData -= sectionBytesToRemove
                     pe.OPTIONAL_HEADER.SizeOfImage -= sectionBytesToRemove 
 
-                    endOfRealData = section.PointerToRawData + delta_last_non_zero + 1
 
 
                 ## Handle specific bloated sections
