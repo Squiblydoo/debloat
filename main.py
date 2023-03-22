@@ -24,6 +24,7 @@ def main() -> int:
         return 1
 
     processor.process_pe(pe, out_path=str(out_path), log_message=print)
+    return 0
 
 
 if __name__ == "__main__":
