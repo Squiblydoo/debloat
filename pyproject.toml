@@ -1,0 +1,22 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "debloat"
+version = "1.2.0"
+authors = [
+  { name="Squiblydoo", email="Squiblydoo@pm.me" },
+]
+description = "Debloat is an tool to remove excess garbage from bloated executables."
+readme = "README.md"
+requires-python = ">=3.7"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: BSD-3-Clause license",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/Squiblydoo/debloat"
+"Bug Tracker" = "https://github.com/Squiblydoo/debloat/issues"
