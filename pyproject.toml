@@ -12,8 +12,8 @@ description = "Debloat is an tool to remove excess garbage from bloated executab
 readme = "README.md"
 requires-python = ">=3.6"
 dependencies = [
-  "tkinterdnd2",
-  "pefile"
+  "tkinterdnd2>0.3.0",
+  "pefile>2023.2.0"
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
