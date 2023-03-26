@@ -1,6 +1,6 @@
 from pathlib import Path
 import pefile
-import processor
+import debloat.processor
 import argparse
 import sys
 
@@ -23,7 +23,7 @@ def main() -> int:
         print("Provided file is not an executable! Please try again with an executable. Maybe it needs unzipped?")
         return 1
 
-    processor.process_pe(pe, out_path=str(out_path), log_message=print)
+    debloat.processor.process_pe(pe, out_path=str(out_path), log_message=print)
     return 0
 
 

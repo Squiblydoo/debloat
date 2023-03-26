@@ -9,7 +9,7 @@ from functools import partial
 import time
 import re
 from typing import Tuple, Optional, Any
-from processor import process_pe
+from debloat.processor import process_pe
 
 class MainWindow(TkinterDnD.Tk):
     def __init__(self) -> None:

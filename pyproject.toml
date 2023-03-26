@@ -1,22 +1,31 @@
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "debloat"
-version = "1.2.0"
+version = "1.3.0"
 authors = [
   { name="Squiblydoo", email="Squiblydoo@pm.me" },
 ]
 description = "Debloat is an tool to remove excess garbage from bloated executables."
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = ">=3.6"
+dependencies = [
+  "tkinterdnd2",
+  "pefile"
+]
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: BSD-3-Clause license",
+    "License :: OSI Approved :: BSD License",
     "Operating System :: OS Independent",
 ]
 
 [project.urls]
 "Homepage" = "https://github.com/Squiblydoo/debloat"
 "Bug Tracker" = "https://github.com/Squiblydoo/debloat/issues"
+
+
+[project.scripts]
+debloat = "debloat.main:main"
+debloat-gui = "debloat.gui:main"
