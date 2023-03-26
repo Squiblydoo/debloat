@@ -1,0 +1,2 @@
+tkinterdnd2
+pefile
