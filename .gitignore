@@ -3,3 +3,4 @@ build/
 dist/
 virt/
 src/debloat.egg-info/
+src/debloat/dist

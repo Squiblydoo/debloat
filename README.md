@@ -24,8 +24,8 @@ Running the program should debloat the binary in 30-40 second on average; as lon
 <img width="602" alt="Screenshot 2023-01-29 at 2 52 13 PM" src="https://user-images.githubusercontent.com/77356206/215352245-b37091ce-4d58-415c-a7ba-44a9c45bd6f1.png">
 
 ## How to use the CLI?
-After installing using `pip install debloat` use the command `debloat`.
-`debloat` can take two arguments. The first argument is required: the file to debloat. The second argument is optional: the output location.
+After installing using `pip install debloat` use the command `debloat`.<br>
+`debloat` can take two arguments. The first argument is required: the file to debloat. The second argument is optional: the output location. When no output is provided, it will be written to the same directory as the original file.
 
 The gui can also be launched from the CLI using the command `debloat-gui`.
 
@@ -72,14 +72,16 @@ There are good solid manual methods to remove bloat from binaries, but these met
 Follow the build commands appropriate to your platform. The main difference between build commands is the format of the icon.
 <br>
 MacOS<br>
-`pyinstaller --onefile --noconsole --additional-hooks-dir=./hook --icon=debloat.icns debloat.py`
+`pyinstaller --onefile --noconsole --additional-hooks-dir=./hook --icon=debloat.icns gui.py`
 
 Windows<br>
-`pyinstaller --onefile  --noconsole  --additional-hooks-dir=./hook --icon=debloat.ico debloat.py`
+`pyinstaller --onefile  --noconsole  --additional-hooks-dir=./hook --icon=debloat.ico gui.py`
 
 Linux<br> 
-`~/.local/bin/pyinstaller --onefile --noconsole --icon=debloat.ico --additional-hooks-dir=./hook --add-binary "/home/redacted/.local/lib/python3.10/site-packages/:." debloat.py`
+`~/.local/bin/pyinstaller --onefile --noconsole --icon=debloat.ico --additional-hooks-dir=./hook --add-binary "/home/redacted/.local/lib/python3.10/site-packages/:." gui.py`
 - I'm not sure why the same hook didn't work on Linux and pointing to the site-packages directory is not preferred. For some unknown reason, it would not find the binary if I pointed to the specific tkinterdnd2 or tkdnd directories.
 
 ## Where is this project going next?
-The current plan is to build in CLI functionality to handle batch jobs. At that stage, it will process all the files in a directory and output a report.
+Batch processing: process all files in a directory and produce a report.
+
+Better support for using processing methods outside of debloat.
