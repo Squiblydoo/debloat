@@ -1,8 +1,8 @@
 MacOS
-pyinstaller --onefile --noconsole --additional-hooks-dir=./hook --icon=debloat.icns debloat.py
+pyinstaller --onefile --noconsole --additional-hooks-dir=./hook --icon=debloat.icns gui.py
 
 Windows
-pyinstaller --onefile  --noconsole  --additional-hooks-dir=./hook --icon=debloat.ico debloat.py
+pyinstaller --onefile  --noconsole  --additional-hooks-dir=./hook --icon=debloat.ico gui.py
 
 Linux
-~/.local/bin/pyinstaller --onefile --noconsole --icon=debloat.ico --additional-hooks-dir=./hook --add-binary "/home/redacted/.local/lib/python3.10/site-packages/:." debloat.py
+~/.local/bin/pyinstaller --onefile --noconsole --icon=debloat.ico --additional-hooks-dir=./hook --add-binary "/home/redacted/.local/lib/python3.10/site-packages/:." gui.py
