@@ -15,6 +15,12 @@ def main() -> int:
                         help="Output location", 
                         type=Path,
                         required=False)
+    parser.add_argument("-s", "--safe", 
+                        help="""
+    Enable Safe processing. Without this setting Debloat may remove the
+    whole PE Overlay as a last resort if no smarter method works.
+                            """,
+                        action='store_true', default=False)
     args = parser.parse_args()
 
     file_path = args.executable
@@ -33,8 +39,9 @@ def main() -> int:
         return 1
 
     processor.process_pe(pe, 
-                        out_path=str(out_path), 
-                        log_message=print)
+                        out_path=str(out_path), safe_processing=args.safe,
+                        log_message=print
+                        )
     return 0
 
 if __name__ == "__main__":

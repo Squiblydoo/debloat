@@ -56,7 +56,7 @@ def check_for_packer(pe: pefile.PE) -> int:
     packer_header_match = re.search(rb"^.\x00\x00\x00\xef\xbe\xad\xdeNullsoftInst",
                                   packer_header)
     if packer_header_match:
-        print("Nullsoft Header found.")
+        print("Nullsoft Header found. Use the tool UniExtract2 to extract.")
         nullsoft_header_size = int.from_bytes(packer_header[18:21], "big")
         return nullsoft_header_size
     return 0
@@ -178,12 +178,12 @@ def check_section_entropy(pe: pefile.PE, end_of_real_data) -> Tuple[pefile.PE, i
             return pe, end_of_real_data, result
         
 def trim_junk(pe: pefile.PE, end_of_real_data) -> int:
-    backwards_pe = pe.write()[::-1]
+    backwards_overlay = pe.get_overlay()[::-1]
     # Regex Explained:
     # Match raw bytes that are repeated more than 20 times at the end
     # of a binary
     delta_last_non_junk = end_of_real_data
-    junk_match = re.search(rb'^(..)\1{20,}', backwards_pe)
+    junk_match = re.search(rb'^(..)\1{20,}', backwards_overlay[:200])
     # If "not junk_match" check for junk larger than 1 byte
     if not junk_match:
         # Brute force check: check to see if there are 1-20 bytes
@@ -195,23 +195,22 @@ def trim_junk(pe: pefile.PE, end_of_real_data) -> int:
             # of repeated bytes 1 or more times. 
             junk_regex = rb"^(..{" + bytes(str(i), "utf-8") + rb"})\1{2,}"
             # Check against 200 bytes, if successful, calculate full match.
-            repeated_junk_regex = re.search(junk_regex, backwards_pe[:200])
+            repeated_junk_regex = re.search(junk_regex, backwards_overlay[:200])
             if repeated_junk_regex:
-                repeated_junk_regex = re.search(junk_regex, backwards_pe)
-                delta_last_non_junk = end_of_real_data - repeated_junk_regex.end(0)
+                repeated_junk_regex = re.search(junk_regex, backwards_overlay)
+                junk_to_remove = repeated_junk_regex.end(0)
+                delta_last_non_junk = end_of_real_data - junk_to_remove
                 break
     # Junk was identified. New end_of_real_data is assigned and returned.
     else:
-        delta_last_non_junk = end_of_real_data - junk_match.end(0)
+        junk_match = re.search(rb'^(..)\1{20,}', backwards_overlay)
+        junk_to_remove = junk_match.end(0)
+        delta_last_non_junk = end_of_real_data - junk_to_remove
     return delta_last_non_junk
-    #trimmed_pe = pe.trim()
-    #if len(pe.write()) == end_of_real_data:
-    #    return end_of_real_data
-    #else:
-    #    return len(trimmed_pe.write())
 
 
-def process_pe(pe: pefile.PE, out_path: str, 
+
+def process_pe(pe: pefile.PE, out_path: str, safe_processing: bool,
                log_message: Callable[[str], None]) -> None:
     '''Prepare PE, perform checks, remote junk, write patched binary.'''
     beginning_file_size = len(pe.write())
@@ -226,13 +225,13 @@ def process_pe(pe: pefile.PE, out_path: str,
     signature_abnormality = handle_signature_abnormality(signature_address, 
                                                         signature_size, 
                                                         beginning_file_size)
+    overlay_size = len(pe.get_overlay())
     if signature_abnormality:
         log_message("We detected data after the signature.\
                      This is abnormal.\nRemoving signature and extra data...")
         end_of_real_data = signature_address
     # Handle Overlays: this includes packers and overlays which are completely junk
-    elif pe.get_overlay_data_start_offset() and \
-         signature_size < len(pe.get_overlay()):
+    elif pe.get_overlay_data_start_offset() and signature_size < overlay_size:
         log_message("An overlay was detected. Checking for known packer.")
         if check_for_packer(pe):
             log_message("Packer identified")
@@ -240,12 +239,20 @@ def process_pe(pe: pefile.PE, out_path: str,
             log_message("Packer not identified. Attempting dynamic trim...")
             end_of_real_data = trim_junk(pe, end_of_real_data)
             if end_of_real_data == beginning_file_size:
-                log_message("Overlay was unable to be trimmed.\
-                            Try unpacking with UniExtract2.")
-                #unable to trim
-                # Last resort: This will remove entire Overlay
-                #last_section = find_last_section(pe, end_of_real_data)
-                #end_of_real_data = last_section.PointerToRawData + last_section.SizeOfRawData 
+                if safe_processing is True:
+                    log_message("""
+Overlay was unable to be trimmed. Try unpacking with UniExtract2 or re-running 
+Debloat without the "safe" parameter.""")
+                else:
+                    log_message("""
+No "--safe" switch detected. Running unsafe debloat technique:\n
+This is the last resort of removing the whole overlay: this works in some 
+cases, but can remove critical content. 
+If file is a Nullsoft executable, but was not detected, it can be unpacked with
+ the tool "UniExtract2".
+                    """)
+                    last_section = find_last_section(pe)
+                    end_of_real_data = last_section.PointerToRawData + last_section.SizeOfRawData 
     # Handle bloated sections
     # TODO: break up into functions
     else:
@@ -255,10 +262,12 @@ def process_pe(pe: pefile.PE, out_path: str,
         log_message(result)
     # All processing is done. Report results.
     if end_of_real_data == beginning_file_size:
-        log_message("\nNo automated method for reducing the size worked.\
-                    \nPlease consider sharing the sample for additional \
-                    analysis.\nEmail: Squiblydoo@pm.me\
-                    \nTwitter: @SquiblydooBlog.\n")
+        log_message("""
+No automated method for reducing the size worked. Please consider sharing the
+sample for additional analysis.
+Email: Squiblydoo@pm.me
+Twitter: @SquiblydooBlog.
+                    """)
     else:
         final_filesize, new_pe_name = write_patched_file(out_path,
                                                          pe, 
