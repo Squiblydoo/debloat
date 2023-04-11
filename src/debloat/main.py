@@ -4,15 +4,16 @@ import sys
 from pathlib import Path
 import argparse
 import pefile
-import debloat.processor
+import processor
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("executable", \
-                        help="Path to the executable to be debloated",\
+    parser.add_argument("executable", 
+                        help="Path to the executable to be debloated",
                         type=Path)
-    parser.add_argument("--output", \
-                        help="Output location", type=Path,\
+    parser.add_argument("--output", 
+                        help="Output location", 
+                        type=Path,
                         required=False)
     args = parser.parse_args()
 
@@ -31,9 +32,9 @@ def main() -> int:
               Maybe it needs unzipped?")
         return 1
 
-    debloat.processor.process_pe(pe, \
-                                 out_path=str(out_path), \
-                                 log_message=print)
+    processor.process_pe(pe, 
+                        out_path=str(out_path), 
+                        log_message=print)
     return 0
 
 if __name__ == "__main__":

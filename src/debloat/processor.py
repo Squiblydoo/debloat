@@ -15,8 +15,8 @@ def readable_size(value: int) -> str:
     else:
         return '%.1f GB' % (float(value) / 1024.0 / 1024.0 / 1024.0)
 
-def write_patched_file(out_path: str,\
-                        pe: pefile.PE, \
+def write_patched_file(out_path: str,
+                        pe: pefile.PE, 
                         end_of_real_data: int) -> Tuple[int, str]:
     '''Writes the patched file to disk.
     
@@ -29,8 +29,8 @@ def write_patched_file(out_path: str,\
         final_filesize = len(pe.write()[:end_of_real_data])
         return final_filesize, out_path
 
-def handle_signature_abnormality(signature_address: int,\
-                                signature_size: int, \
+def handle_signature_abnormality(signature_address: int,
+                                signature_size: int, 
                                 beginning_file_size: int) -> bool:
     '''Remove all bytes after a PE signature'''
     # If the signature_address is 0, there was no original signature.
@@ -53,7 +53,7 @@ def check_for_packer(pe: pefile.PE) -> int:
     # find the end of the Packer content based on headers. This may 
     # result in specific rules for specific headers or may end up 
     # requiring a genernic method to handle different file types.
-    packer_header_match = re.search(rb"^.\x00\x00\x00\xef\xbe\xad\xdeNullsoftInst",\
+    packer_header_match = re.search(rb"^.\x00\x00\x00\xef\xbe\xad\xdeNullsoftInst",
                                   packer_header)
     if packer_header_match:
         print("Nullsoft Header found.")
@@ -78,54 +78,48 @@ def remove_signature(pe: pefile.PE) -> Tuple[int, int]:
     pe.OPTIONAL_HEADER.DATA_DIRECTORY[pefile.DIRECTORY_ENTRY['IMAGE_DIRECTORY_ENTRY_SECURITY']].Size = 0
     return signature_address, signature_size
 
-def process_pe(pe: pefile.PE, out_path: str, \
-               log_message: Callable[[str], None]) -> None:
-    '''Perpare PE, perform checks, remote junk, write patched binary.'''
-    beginning_file_size = len(pe.write())
-    # We are using the variable "end_of_real_data" and are reassigning 
-    # the value based on our analysis.We are assigning it now in case 
-    # we are unable to reduce the binary size for any reason.
-    end_of_real_data = beginning_file_size
-    log_message("Beginning File size: " \
-                + readable_size(beginning_file_size) + ".")
-    # Remove Signature and modify size of Optional Header Security entry.
-    signature_address, signature_size = remove_signature(pe)
-    signature_abnormality = handle_signature_abnormality(signature_address, \
-                                                        signature_size, \
-                                                        beginning_file_size)
-    if signature_abnormality:
-        log_message("We detected data after the signature.\
-                     This is abnormal.\nRemoving signature and extra data...")
-        end_of_real_data = signature_address
-    # Handle Overlays: this includes packers and overlays which are completely junk
-    elif pe.get_overlay_data_start_offset() and \
-         signature_size < len(pe.get_overlay()):
-        log_message("An overlay was detected. Checking for known packer.")
-        if check_for_packer(pe):
-            log_message("Packer identified")
-        else:
-            log_message("No use of packer identified. Removing whole overlay...")
-            last_section = find_last_section(pe)
-            end_of_real_data = last_section.PointerToRawData + last_section.SizeOfRawData 
-    # Handle bloated sections
-    # TODO: break up into functions
-    else:
-        # In order to solve some use cases, we will find the biggest section 
-        # within the binary.
+def remove_resources(pe: pefile.PE, biggest_section: pefile.SectionStructure) -> Tuple[pefile.PE, int]:
+    # This method removed PE resources but not .NET Resources.
+    # PE resources are in the .rcsc section of the binary; 
+    # .NET are in the .text section.
+    # The following nonsense was determined to be the best way
+    # to iterate through resources and find the offending ones.
+    end_of_real_data = len([pe.write()])
+    entry_list = pe.DIRECTORY_ENTRY_RESOURCE.entries
+    for resource_type in pe.DIRECTORY_ENTRY_RESOURCE.entries:
+        if hasattr(resource_type, 'directory'):
+            for resource_id in resource_type.directory.entries:
+                if hasattr(resource_id, 'directory'):
+                    for resource_lang in resource_id.directory.entries:
+                        if hasattr(resource_lang, 'data'):
+                            if resource_lang.data.struct.Size > 50000:
+                                ## If the resource is bloated, remove it with pop
+                                ## then subtract the size from the end_of_real_data variable
+                                resource_type.directory.entries.pop()
+                                end_of_real_data -= resource_lang.data.struct.Size
+                                pe.OPTIONAL_HEADER.DATA_DIRECTORY[2].Size -= resource_lang.data.struct.Size 
+                                pe.sections[pe.sections.index(biggest_section)].SizeOfRawData -= resource_lang.data.struct.Size
+                                pe.sections[pe.sections.index(biggest_section)].Misc_VirtualSize -= resource_lang.data.struct.Size
+                                pe.sections[pe.sections.index(biggest_section)].section_max_addr -= resource_lang.data.struct.Size
+        pe.DIRECTORY_ENTRY_RESOURCE.entries[entry_list.index(resource_type)] = resource_type
+    return pe, end_of_real_data
+
+def check_section_entropy(pe: pefile.PE, end_of_real_data) -> Tuple[pefile.PE, int, str]:
         biggest_section = None
+        result = ""
         for section in pe.sections:
             section_name = section.Name.decode()
             section_entropy = section.get_entropy()
-            log_message("Section "  + section_name) 
-            log_message(" Entropy: " + str(round(section_entropy, 4)) + " " )
-            log_message("Size of section: " + readable_size(section.SizeOfRawData) +".")
+            result += "Section: "  + section_name + "\t "
+            result += " Entropy: " + str(round(section_entropy, 4)) + "\t " 
+            result += "Size of section: " + readable_size(section.SizeOfRawData) +"." + "\n"
             # The use cases covered by this section are at the end of 
             # the binary. In my experience, the bloated sections are 
             # usually at the end unless they are bloat from .NET Resources.
             if section_entropy < 0.09 and section.SizeOfRawData > 100000:
-                log_message("Entropy of section is exteremely low.\n This is \
+                result += "Entropy of section is exteremely low.\n This is \
                             indicative of a bloated section.\n Removing bloated\
-                            section...")
+                            section..." + "\n"
                 # Get the size of the section.
                 section_end = section.PointerToRawData + section.SizeOfRawData
                 # If the entropy is simply 0.00, there is no data to be 
@@ -143,18 +137,21 @@ def process_pe(pe: pefile.PE, out_path: str, \
                     section_end = section.PointerToRawData + section.SizeOfRawData
                     section_data = pe.write()[section.PointerToRawData:section_end]
                     backward_section_data = section_data[::-1]
-                    junkMatch = re.search(rb"(.)\1{100,}", backward_section_data)
-                    if not junkMatch:
+                    junk_match = re.search(rb"(.)\1{100,}", backward_section_data)
+                    if not junk_match:
                         delta_last_non_zero = len(backward_section_data)
                     else:
-                        delta_last_non_zero = len(backward_section_data) - junkMatch.end(0)
-                    section_bytes_to_remove = beginning_file_size \
+                        delta_last_non_zero = len(backward_section_data)\
+                              - junk_match.end(0)
+                    section_bytes_to_remove = end_of_real_data \
                         - (section.PointerToRawData + delta_last_non_zero + 1)
                     end_of_real_data = section.PointerToRawData + delta_last_non_zero + 1
                 ## Fix last section header, SizeOfRawData, SizeOfImage.
                 section.Misc_VirtualSize -= section_bytes_to_remove
                 section.SizeOfRawData -= section_bytes_to_remove
-                pe.OPTIONAL_HEADER.SizeOfImage -= section_bytes_to_remove 
+                pe.OPTIONAL_HEADER.SizeOfImage -= section_bytes_to_remove
+                result += "Bloated section reduced." + "\n"
+                return pe, end_of_real_data, result
             # Handle specific bloated sections
             if biggest_section == None:
                 biggest_section = section
@@ -167,34 +164,95 @@ def process_pe(pe: pefile.PE, out_path: str, \
             # resource is not at the end of an executable.
             # TODO: Handle other tomfoolery required when resource 
             # is not at end of executable.
-            log_message("Bloat was located in the resource section.\n\
-                        Removing bloat..")
-            # The following nonsense was determined to be the best way
-            # to iterate through resources and find the offending one.
-            entry_list = pe.DIRECTORY_ENTRY_RESOURCE.entries
-            for resource_type in pe.DIRECTORY_ENTRY_RESOURCE.entries:
-                if hasattr(resource_type, 'directory'):
-                    for resource_id in resource_type.directory.entries:
-                        if hasattr(resource_id, 'directory'):
-                            for resource_lang in resource_id.directory.entries:
-                                if hasattr(resource_lang, 'data'):
-                                    if resource_lang.data.struct.Size > 50000:
-                                        ## If the resource is bloated, remove it with pop
-                                        ## then subtract the size from the end_of_real_data variable
-                                        resource_type.directory.entries.pop()
-                                        end_of_real_data -= resource_lang.data.struct.Size
-                                        pe.OPTIONAL_HEADER.DATA_DIRECTORY[2].Size -= resource_lang.data.struct.Size 
-                                        pe.sections[pe.sections.index(biggest_section)].SizeOfRawData -= resource_lang.data.struct.Size
-                                        pe.sections[pe.sections.index(biggest_section)].Misc_VirtualSize -= resource_lang.data.struct.Size
-                                        pe.sections[pe.sections.index(biggest_section)].section_max_addr -= resource_lang.data.struct.Size
-                pe.DIRECTORY_ENTRY_RESOURCE.entries[entry_list.index(resource_type)] = resource_type
+            result += "Bloat was located in the resource section.\n\
+                        Removing bloat.." + "\n"
+            pe, end_of_real_data = remove_resources(pe, biggest_section)
+            return pe, end_of_real_data, result
         elif biggest_section.Name.decode() == ".text\x00\x00\x00":
-            log_message("Bloat was detected in the text section.")
+            result += "Bloat was detected in the text section." + "\n"
             # Data stored in the .text section is often a .NET Resource. The following checks
             # to confirm it is .NET and then drops the resources.
             if pe.OPTIONAL_HEADER.DATA_DIRECTORY[14].Size:
-                log_message("Bloat is likely in a .NET Resource\n\
-                            This use case cannot be processed at this time.")
+                result += "Bloat is likely in a .NET Resource\n\
+                            This use case cannot be processed at this time." + "\n"
+            return pe, end_of_real_data, result
+        
+def trim_junk(pe: pefile.PE, end_of_real_data) -> int:
+    backwards_pe = pe.write()[::-1]
+    # Regex Explained:
+    # Match raw bytes that are repeated more than 20 times at the end
+    # of a binary
+    delta_last_non_junk = end_of_real_data
+    junk_match = re.search(rb'^(..)\1{20,}', backwards_pe)
+    # If "not junk_match" check for junk larger than 1 byte
+    if not junk_match:
+        # Brute force check: check to see if there are 1-20 bytes
+        # being repeated and feed the number into the regex
+        for i in range(20):
+            # Regex Explained:
+            # Starting at the end of the PE, check for repeated bytes.
+            # This indicates junk bytes in the overlay. Match that set
+            # of repeated bytes 1 or more times. 
+            junk_regex = rb"^(..{" + bytes(str(i), "utf-8") + rb"})\1{2,}"
+            # Check against 200 bytes, if successful, calculate full match.
+            repeated_junk_regex = re.search(junk_regex, backwards_pe[:200])
+            if repeated_junk_regex:
+                repeated_junk_regex = re.search(junk_regex, backwards_pe)
+                delta_last_non_junk = end_of_real_data - repeated_junk_regex.end(0)
+                break
+    # Junk was identified. New end_of_real_data is assigned and returned.
+    else:
+        delta_last_non_junk = end_of_real_data - junk_match.end(0)
+    return delta_last_non_junk
+    #trimmed_pe = pe.trim()
+    #if len(pe.write()) == end_of_real_data:
+    #    return end_of_real_data
+    #else:
+    #    return len(trimmed_pe.write())
+
+
+def process_pe(pe: pefile.PE, out_path: str, 
+               log_message: Callable[[str], None]) -> None:
+    '''Prepare PE, perform checks, remote junk, write patched binary.'''
+    beginning_file_size = len(pe.write())
+    # We are using the variable "end_of_real_data" and are reassigning 
+    # the value based on our analysis.We are assigning it now in case 
+    # we are unable to reduce the binary size for any reason.
+    end_of_real_data = beginning_file_size
+    log_message("Beginning File size: " \
+                + readable_size(beginning_file_size) + ".")
+    # Remove Signature and modify size of Optional Header Security entry.
+    signature_address, signature_size = remove_signature(pe)
+    signature_abnormality = handle_signature_abnormality(signature_address, 
+                                                        signature_size, 
+                                                        beginning_file_size)
+    if signature_abnormality:
+        log_message("We detected data after the signature.\
+                     This is abnormal.\nRemoving signature and extra data...")
+        end_of_real_data = signature_address
+    # Handle Overlays: this includes packers and overlays which are completely junk
+    elif pe.get_overlay_data_start_offset() and \
+         signature_size < len(pe.get_overlay()):
+        log_message("An overlay was detected. Checking for known packer.")
+        if check_for_packer(pe):
+            log_message("Packer identified")
+        else:
+            log_message("Packer not identified. Attempting dynamic trim...")
+            end_of_real_data = trim_junk(pe, end_of_real_data)
+            if end_of_real_data == beginning_file_size:
+                log_message("Overlay was unable to be trimmed.\
+                            Try unpacking with UniExtract2.")
+                #unable to trim
+                # Last resort: This will remove entire Overlay
+                #last_section = find_last_section(pe, end_of_real_data)
+                #end_of_real_data = last_section.PointerToRawData + last_section.SizeOfRawData 
+    # Handle bloated sections
+    # TODO: break up into functions
+    else:
+        # In order to solve some use cases, we will find the biggest section 
+        # within the binary.
+        pe, end_of_real_data, result = check_section_entropy(pe, end_of_real_data)
+        log_message(result)
     # All processing is done. Report results.
     if end_of_real_data == beginning_file_size:
         log_message("\nNo automated method for reducing the size worked.\
@@ -202,9 +260,8 @@ def process_pe(pe: pefile.PE, out_path: str, \
                     analysis.\nEmail: Squiblydoo@pm.me\
                     \nTwitter: @SquiblydooBlog.\n")
     else:
-        log_message("Writing to file...")
-        final_filesize, new_pe_name = write_patched_file(out_path,\
-                                                         pe, \
+        final_filesize, new_pe_name = write_patched_file(out_path,
+                                                         pe, 
                                                          end_of_real_data)
         reduction_calculation = round(((beginning_file_size \
                                         - final_filesize) \
