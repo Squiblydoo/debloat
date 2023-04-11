@@ -15,9 +15,9 @@ def main() -> int:
                         help="Output location", 
                         type=Path,
                         required=False)
-    parser.add_argument("-s", "--safe", 
+    parser.add_argument("-u", "--unsafe", 
                         help="""
-    Enable Safe processing. Without this setting Debloat may remove the
+    Disable safe processing. With unsafe processing, Debloat may remove the
     whole PE Overlay as a last resort if no smarter method works.
                             """,
                         action='store_true', default=False)
@@ -39,7 +39,7 @@ def main() -> int:
         return 1
 
     processor.process_pe(pe, 
-                        out_path=str(out_path), safe_processing=args.safe,
+                        out_path=str(out_path), unsafe_processing=args.unsafe,
                         log_message=print
                         )
     return 0

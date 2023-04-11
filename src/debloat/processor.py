@@ -230,7 +230,7 @@ def trim_junk(pe: pefile.PE, end_of_real_data) -> int:
         delta_last_non_junk = end_of_real_data - junk_to_remove
     return delta_last_non_junk
 
-def process_pe(pe: pefile.PE, out_path: str, safe_processing: bool,
+def process_pe(pe: pefile.PE, out_path: str, unsafe_processing: bool,
                log_message: Callable[[str], None]) -> None:
     '''Prepare PE, perform checks, remote junk, write patched binary.'''
     beginning_file_size = len(pe.write())
@@ -257,13 +257,9 @@ def process_pe(pe: pefile.PE, out_path: str, safe_processing: bool,
             log_message("Packer not identified. Attempting dynamic trim...")
             end_of_real_data = trim_junk(pe, end_of_real_data)
             if end_of_real_data == beginning_file_size:
-                if safe_processing is True:
+                if unsafe_processing is True:
                     log_message("""
-Overlay was unable to be trimmed. Try unpacking with UniExtract2 or re-running 
-Debloat without the "safe" parameter.""")
-                else:
-                    log_message("""
-No "--safe" switch detected. Running unsafe debloat technique:\n
+"Unsafe" switch detected. Running unsafe debloat technique:\n
 This is the last resort of removing the whole overlay: this works in some 
 cases, but can remove critical content. 
 If file is a Nullsoft executable, but was not detected, the original file can 
@@ -271,6 +267,11 @@ be unpacked with the tool "UniExtract2".
                     """)
                     last_section = find_last_section(pe)
                     end_of_real_data = last_section.PointerToRawData + last_section.SizeOfRawData 
+                else:
+                    log_message("""
+Overlay was unable to be trimmed. Try unpacking with UniExtract2 or re-running 
+Debloat without the "--unsafe" parameter."""
+                                )
     # Handle bloated sections
     # TODO: break up into functions
     else:
