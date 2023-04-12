@@ -196,20 +196,37 @@ def trim_junk(pe: pefile.PE, end_of_real_data) -> int:
             # This indicates junk bytes in the overlay. Match that set
             # of repeated bytes 1 or more times. 
             junk_regex = rb"^(..{" + bytes(str(i), "utf-8") + rb"})\1{2,}"
-            repeated_junk_regex = re.search(junk_regex, backwards_overlay[:200])
-            if repeated_junk_regex:
+            multibyte_junk_regex = re.search(junk_regex, backwards_overlay[:200])
+            if multibyte_junk_regex:
                 # Having found the pattern, we can make the regex efficient
                 # by targeting the pattern using the "targeted_regex"
-                targeted_regex = rb"(" + repeated_junk_regex.string + rb")\1{2,}"
-                repeated_junk_regex = re.search(targeted_regex, backwards_overlay)
-                junk_to_remove = repeated_junk_regex.end(0)
+                targeted_regex = rb"(" + multibyte_junk_regex.string + rb")\1{2,}"
+                multibyte_junk_regex = re.search(targeted_regex, backwards_overlay)
+                junk_to_remove = multibyte_junk_regex.end(0)
                 delta_last_non_junk = end_of_real_data - junk_to_remove
                 break
     # Junk was identified. New end_of_real_data is assigned and returned.
     else:
-        targeted_regex = rb"("+ junk_match.string + rb")\1{2,}"
-        targetd_junk_match = re.search(targeted_regex, backwards_overlay)
-        junk_to_remove = targetd_junk_match.end(0)
+        targeted_regex = rb""+ junk_match.string + rb"{1,}"
+        targeted_junk_match = re.search(targeted_regex, backwards_overlay)
+        junk_to_remove = targeted_junk_match.end(0)
+        # If the trimming did not remove more than half of the bytes then
+        # this suggests the attacker may have put a random series of
+        # repeated bytes. These will be removed by loading the overlay
+        # 200 bytes at a time and removing parts which repeat for more
+        # than 20 bytes.
+        if junk_to_remove < end_of_real_data / 2:
+            chunk_start = targeted_junk_match.end(0)
+            chunk_end = chunk_start
+            while end_of_real_data > chunk_end:
+                chunk_end = chunk_start + 200
+                repeated_junk_match = re.search(rb'(..)\1{20,}', 
+                                                backwards_overlay[chunk_start:chunk_end])
+                if repeated_junk_match:
+                    chunk_start += repeated_junk_match.end(0)
+                else:
+                    break
+            junk_to_remove = chunk_start
         delta_last_non_junk = end_of_real_data - junk_to_remove
     return delta_last_non_junk
 
