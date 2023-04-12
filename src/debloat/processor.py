@@ -178,11 +178,13 @@ def check_section_entropy(pe: pefile.PE, end_of_real_data) -> Tuple[pefile.PE, i
             return pe, end_of_real_data, result
         
 def trim_junk(pe: pefile.PE, end_of_real_data) -> int:
+    ''' Attempt multiple methods or removing junk from overlay.'''
     backwards_overlay = pe.get_overlay()[::-1]
     # Regex Explained:
     # Match raw bytes that are repeated more than 20 times at the end
-    # of a binary
+    # of a binary. Trims 1 repeating byte.
     delta_last_non_junk = end_of_real_data
+    # Check against 200 bytes, if successful, calculate full match.
     junk_match = re.search(rb'^(..)\1{20,}', backwards_overlay[:200])
     # If "not junk_match" check for junk larger than 1 byte
     if not junk_match:
@@ -194,21 +196,22 @@ def trim_junk(pe: pefile.PE, end_of_real_data) -> int:
             # This indicates junk bytes in the overlay. Match that set
             # of repeated bytes 1 or more times. 
             junk_regex = rb"^(..{" + bytes(str(i), "utf-8") + rb"})\1{2,}"
-            # Check against 200 bytes, if successful, calculate full match.
             repeated_junk_regex = re.search(junk_regex, backwards_overlay[:200])
             if repeated_junk_regex:
-                repeated_junk_regex = re.search(junk_regex, backwards_overlay)
+                # Having found the pattern, we can make the regex efficient
+                # by targeting the pattern using the "targeted_regex"
+                targeted_regex = rb"(" + repeated_junk_regex.string + rb")\1{2,}"
+                repeated_junk_regex = re.search(targeted_regex, backwards_overlay)
                 junk_to_remove = repeated_junk_regex.end(0)
                 delta_last_non_junk = end_of_real_data - junk_to_remove
                 break
     # Junk was identified. New end_of_real_data is assigned and returned.
     else:
-        junk_match = re.search(rb'^(..)\1{20,}', backwards_overlay)
-        junk_to_remove = junk_match.end(0)
+        targeted_regex = rb"("+ junk_match.string + rb")\1{2,}"
+        targetd_junk_match = re.search(targeted_regex, backwards_overlay)
+        junk_to_remove = targetd_junk_match.end(0)
         delta_last_non_junk = end_of_real_data - junk_to_remove
     return delta_last_non_junk
-
-
 
 def process_pe(pe: pefile.PE, out_path: str, safe_processing: bool,
                log_message: Callable[[str], None]) -> None:
@@ -218,8 +221,6 @@ def process_pe(pe: pefile.PE, out_path: str, safe_processing: bool,
     # the value based on our analysis.We are assigning it now in case 
     # we are unable to reduce the binary size for any reason.
     end_of_real_data = beginning_file_size
-    log_message("Beginning File size: " \
-                + readable_size(beginning_file_size) + ".")
     # Remove Signature and modify size of Optional Header Security entry.
     signature_address, signature_size = remove_signature(pe)
     signature_abnormality = handle_signature_abnormality(signature_address, 
@@ -248,8 +249,8 @@ Debloat without the "safe" parameter.""")
 No "--safe" switch detected. Running unsafe debloat technique:\n
 This is the last resort of removing the whole overlay: this works in some 
 cases, but can remove critical content. 
-If file is a Nullsoft executable, but was not detected, it can be unpacked with
- the tool "UniExtract2".
+If file is a Nullsoft executable, but was not detected, the original file can 
+be unpacked with the tool "UniExtract2".
                     """)
                     last_section = find_last_section(pe)
                     end_of_real_data = last_section.PointerToRawData + last_section.SizeOfRawData 
@@ -275,6 +276,8 @@ Twitter: @SquiblydooBlog.
         reduction_calculation = round(((beginning_file_size \
                                         - final_filesize) \
                                         / beginning_file_size) * 100, 2)
+        log_message("Beginning File size: " \
+                + readable_size(beginning_file_size) + ".")
         log_message("File was reduced by " \
                     + str(reduction_calculation) + "%.")
         log_message("Final file size: " \
