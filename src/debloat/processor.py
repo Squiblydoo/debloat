@@ -243,13 +243,12 @@ def process_pe(pe: pefile.PE, out_path: str, unsafe_processing: bool,
     signature_abnormality = handle_signature_abnormality(signature_address, 
                                                         signature_size, 
                                                         beginning_file_size)
-    overlay_size = len(pe.get_overlay())
     if signature_abnormality:
         log_message("We detected data after the signature.\
                      This is abnormal.\nRemoving signature and extra data...")
         end_of_real_data = signature_address
     # Handle Overlays: this includes packers and overlays which are completely junk
-    elif pe.get_overlay_data_start_offset() and signature_size < overlay_size:
+    elif pe.get_overlay_data_start_offset() and signature_size < len(pe.get_overlay()):
         log_message("An overlay was detected. Checking for known packer.")
         if check_for_packer(pe):
             log_message("Packer identified")
