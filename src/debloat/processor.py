@@ -1,8 +1,11 @@
 """This file handles the processing of binaries and helper methods."""
-
 import re
 from typing import Tuple, Optional, Any, Callable
 import pefile
+
+PACKER = {
+    1 : "Nullsoft"
+}
 
 def readable_size(value: int) -> str:
     '''Return bytes in human readable format.'''
@@ -58,7 +61,7 @@ def check_for_packer(pe: pefile.PE) -> int:
     if packer_header_match:
         print("Nullsoft Header found. Use the tool UniExtract2 to extract.")
         nullsoft_header_size = int.from_bytes(packer_header[18:21], "big")
-        return nullsoft_header_size
+        return 1
     return 0
 
 def find_last_section(pe: pefile.PE) -> Optional[pefile.SectionStructure]:
@@ -110,9 +113,9 @@ def check_section_entropy(pe: pefile.PE, end_of_real_data) -> Tuple[pefile.PE, i
         for section in pe.sections:
             section_name = section.Name.decode()
             section_entropy = section.get_entropy()
-            result += "Section: "  + section_name + "\t "
-            result += " Entropy: " + str(round(section_entropy, 4)) + "\t " 
-            result += "Size of section: " + readable_size(section.SizeOfRawData) +"." + "\n"
+            #result += "Section: "  + section_name + "\t "
+            #result += " Entropy: " + str(round(section_entropy, 4)) + "\t " 
+            #result += "Size of section: " + readable_size(section.SizeOfRawData) +"." + "\n"
             # The use cases covered by this section are at the end of 
             # the binary. In my experience, the bloated sections are 
             # usually at the end unless they are bloat from .NET Resources.
@@ -169,12 +172,12 @@ def check_section_entropy(pe: pefile.PE, end_of_real_data) -> Tuple[pefile.PE, i
             pe, end_of_real_data = remove_resources(pe, biggest_section)
             return pe, end_of_real_data, result
         elif biggest_section.Name.decode() == ".text\x00\x00\x00":
-            result += "Bloat was detected in the text section." + "\n"
             # Data stored in the .text section is often a .NET Resource. The following checks
             # to confirm it is .NET and then drops the resources.
             if pe.OPTIONAL_HEADER.DATA_DIRECTORY[14].Size:
-                result += "Bloat is likely in a .NET Resource\n\
-                            This use case cannot be processed at this time." + "\n"
+                result += '''Bloat was detected in the text section.\n
+                "Bloat is likely in a .NET Resource\n\
+                This use case cannot be processed at this time.\n'''
             return pe, end_of_real_data, result
         
 def trim_junk(pe: pefile.PE, end_of_real_data) -> int:
@@ -250,8 +253,13 @@ def process_pe(pe: pefile.PE, out_path: str, unsafe_processing: bool,
     # Handle Overlays: this includes packers and overlays which are completely junk
     elif pe.get_overlay_data_start_offset() and signature_size < len(pe.get_overlay()):
         log_message("An overlay was detected. Checking for known packer.")
-        if check_for_packer(pe):
-            log_message("Packer identified")
+        packer_idenfitied = check_for_packer(pe)
+        if packer_idenfitied:
+            log_message("Packer identified: " + PACKER[packer_idenfitied])
+            if PACKER[1]:
+                log_message('''
+The original file cannot be debloated. It must be unpacked with a tool such as UniExtract2.
+                ''')
         else:
             log_message("Packer not identified. Attempting dynamic trim...")
             end_of_real_data = trim_junk(pe, end_of_real_data)

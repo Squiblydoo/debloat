@@ -25,7 +25,7 @@ class MainWindow(TkinterDnD.Tk):
                                    text="Drag and drop file onto text bar.")
         self.pathbox_Label.pack()
         self.pathbox = Entry(self, width=150)
-        self.pathbox.pack(padx=20, pady=20)
+        self.pathbox.pack(padx=20)
         self.pathbox.drop_target_register(DND_FILES)
         self.pathbox.dnd_bind("<<Drop>>", self.process_entry)
 
@@ -35,8 +35,18 @@ class MainWindow(TkinterDnD.Tk):
                                      command=self.process)
         self.process_button.pack(pady=10)
 
+        # Safe processing value and checkbox: Maybe not even needed?
+        self.safe_processing = BooleanVar(value=True)
+        #self.safe_checkbox = Checkbutton(self,
+        #                                text="Only remove bloat when certain (safe)",
+        #                                 variable=self.safe_processing)
+        #self.safe_checkbox.pack()
+
         # Define Scrollbox for output of program.
-        self.output_scrollbox = st.ScrolledText(self, width=100, height=100)
+        self.output_scrollbox = st.ScrolledText(self, 
+                                                width=100, 
+                                                height=100,
+                                                wrap=WORD)
         self.output_scrollbox.pack(padx=20, pady=20)
 
     def clear_pathbox(self) -> None:
@@ -74,7 +84,7 @@ class MainWindow(TkinterDnD.Tk):
             return
         out_path = file_path.parent \
             / f"{file_path.stem}_patched{file_path.suffix}"
-        process_pe(pe, out_path=str(out_path), \
+        process_pe(pe,  out_path, self.safe_processing, 
                    log_message=lambda x: self.output_scrollbox_handler(x + "\n"))
         self.output_scrollbox_handler("-----Processessing took %s seconds ---\n" \
                                     % round((time.time() - start_time), 2))
