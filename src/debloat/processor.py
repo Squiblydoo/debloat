@@ -113,9 +113,9 @@ def check_section_entropy(pe: pefile.PE, end_of_real_data) -> Tuple[pefile.PE, i
         for section in pe.sections:
             section_name = section.Name.decode()
             section_entropy = section.get_entropy()
-            #result += "Section: "  + section_name + "\t "
-            #result += " Entropy: " + str(round(section_entropy, 4)) + "\t " 
-            #result += "Size of section: " + readable_size(section.SizeOfRawData) +"." + "\n"
+            result += "Section: "  + section_name + "\t "
+            result += " Entropy: " + str(round(section_entropy, 4)) + "\t " 
+            result += "Size of section: " + readable_size(section.SizeOfRawData) +"." + "\n"
             # The use cases covered by this section are at the end of 
             # the binary. In my experience, the bloated sections are 
             # usually at the end unless they are bloat from .NET Resources.
@@ -140,6 +140,8 @@ def check_section_entropy(pe: pefile.PE, end_of_real_data) -> Tuple[pefile.PE, i
                     section_end = section.PointerToRawData + section.SizeOfRawData
                     section_data = pe.write()[section.PointerToRawData:section_end]
                     backward_section_data = section_data[::-1]
+                    # TODO: refactor junk matching from overlay dynamic 
+                    # trim and implement it within this use case.
                     junk_match = re.search(rb"(.)\1{100,}", backward_section_data)
                     if not junk_match:
                         delta_last_non_zero = len(backward_section_data)
