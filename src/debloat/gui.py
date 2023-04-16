@@ -1,7 +1,6 @@
 """This file handles all GUI components."""
 
 import time
-import threading
 from pathlib import Path 
 from tkinter import *
 import tkinter.scrolledtext as st
@@ -53,11 +52,10 @@ class MainWindow(TkinterDnD.Tk):
         '''Clear any text in the pathbox.'''
         self.pathbox.delete(0,"end")
 
-    def output_scrollbox_handler(self, message: str) -> None:
+    def output_scrollbox_handler(self, message: str, end = "\n", flush=True) -> None:
         '''Insert messages in the textbox.'''
-        output_thread = threading.Thread(self.output_scrollbox.insert(INSERT,\
-                                                                      message))
-        output_thread.start()
+        self.output_scrollbox.insert(INSERT, message + end)
+        self.update()
 
     def process_entry(self, event: Any) -> None:
         '''Check and update user provided file path.'''
@@ -85,7 +83,7 @@ class MainWindow(TkinterDnD.Tk):
         out_path = file_path.parent \
             / f"{file_path.stem}_patched{file_path.suffix}"
         process_pe(pe,  out_path, self.safe_processing, 
-                   log_message=lambda x: self.output_scrollbox_handler(x + "\n"))
+                   log_message=self.output_scrollbox_handler)
         self.output_scrollbox_handler("-----Processessing took %s seconds ---\n" \
                                     % round((time.time() - start_time), 2))
         self.clear_pathbox()

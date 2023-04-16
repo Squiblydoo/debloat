@@ -107,22 +107,24 @@ def remove_resources(pe: pefile.PE, biggest_section: pefile.SectionStructure) ->
         pe.DIRECTORY_ENTRY_RESOURCE.entries[entry_list.index(resource_type)] = resource_type
     return pe, end_of_real_data
 
-def check_section_entropy(pe: pefile.PE, end_of_real_data) -> Tuple[pefile.PE, int, str]:
+def check_section_entropy(pe: pefile.PE, end_of_real_data, 
+                          log_message: Callable[[str], None]) -> Tuple[pefile.PE, int, str]:
         biggest_section = None
         result = ""
         for section in pe.sections:
             section_name = section.Name.decode()
             section_entropy = section.get_entropy()
-            result += "Section: "  + section_name + "\t "
-            result += " Entropy: " + str(round(section_entropy, 4)) + "\t " 
-            result += "Size of section: " + readable_size(section.SizeOfRawData) +"." + "\n"
+            log_message("Section: "  + section_name, end="\t", flush=True)
+            log_message(" Entropy: " + str(round(section_entropy, 4)), end="\t",flush=True) 
+            log_message("Size of section: " + readable_size(section.SizeOfRawData) +".",flush=True)
             # The use cases covered by this section are at the end of 
             # the binary. In my experience, the bloated sections are 
             # usually at the end unless they are bloat from .NET Resources.
             if section_entropy < 0.09 and section.SizeOfRawData > 100000:
-                result += "Entropy of section is exteremely low.\n This is \
-                            indicative of a bloated section.\n Removing bloated\
-                            section..." + "\n"
+                log_message('''
+Entropy of section is exteremely low. This is indicative of a bloated section. 
+Removing bloated section... 
+''', end="", flush=True)
                 # Get the size of the section.
                 section_end = section.PointerToRawData + section.SizeOfRawData
                 # If the entropy is simply 0.00, there is no data to be 
@@ -138,24 +140,50 @@ def check_section_entropy(pe: pefile.PE, end_of_real_data) -> Tuple[pefile.PE, i
                 else:
                     section_data = pe.write()[section.PointerToRawData:section_end]
                     section_end = section.PointerToRawData + section.SizeOfRawData
-                    section_data = pe.write()[section.PointerToRawData:section_end]
                     backward_section_data = section_data[::-1]
                     # TODO: refactor junk matching from overlay dynamic 
-                    # trim and implement it within this use case.
-                    junk_match = re.search(rb"(.)\1{100,}", backward_section_data)
+                    # trim.
+                    junk_match = re.search(rb"(..)\1{20,}", backward_section_data[:200])
                     if not junk_match:
-                        delta_last_non_zero = len(backward_section_data)
+                        for i in range(20):
+                            junk_regex = rb"^(..{" + bytes(str(i), "utf-8") + rb"})\1{2,}"
+                            multibyte_junk_regex = re.search(junk_regex,
+                                                            backward_section_data[:200])
+                            if multibyte_junk_regex:
+                                # Having found the pattern, we can make the regex efficient
+                                # by targeting the pattern using the "targeted_regex"
+                                targeted_regex = rb"(" + multibyte_junk_regex.string + rb")\1{2,}"
+                                multibyte_junk_regex = re.search(targeted_regex,
+                                                                backward_section_data)
+                                junk_to_remove = multibyte_junk_regex.end(0)
+                                delta_last_non_junk = end_of_real_data - junk_to_remove
+                                break
+
                     else:
-                        delta_last_non_zero = len(backward_section_data)\
-                              - junk_match.end(0)
-                    section_bytes_to_remove = end_of_real_data \
-                        - (section.PointerToRawData + delta_last_non_zero + 1)
-                    end_of_real_data = section.PointerToRawData + delta_last_non_zero + 1
-                ## Fix last section header, SizeOfRawData, SizeOfImage.
+                        targeted_regex = rb""+ junk_match.string + rb"{1,}"
+                        targeted_junk_match = re.search(targeted_regex, backward_section_data)
+                        junk_to_remove = targeted_junk_match.end(0)
+                        if junk_to_remove < end_of_real_data / 2:
+                            chunk_start = targeted_junk_match.end(0)
+                            chunk_end = chunk_start
+                            while end_of_real_data > chunk_end:
+                                chunk_end = chunk_start + 200
+                                repeated_junk_match = re.search(rb'(..)\1{20,}', 
+                                                                backward_section_data[chunk_start:chunk_end])
+                                if repeated_junk_match:
+                                    chunk_start += repeated_junk_match.end(0)
+                                else:
+                                    break
+                            junk_to_remove = chunk_start
+                        delta_last_non_junk = len(backward_section_data) - junk_to_remove
+                section_bytes_to_remove = end_of_real_data \
+                    - (section.PointerToRawData + delta_last_non_junk + 1)
+                end_of_real_data = section.PointerToRawData + delta_last_non_junk + 1
+                # This will update the last section header, SizeOfRawData, SizeOfImage.
                 section.Misc_VirtualSize -= section_bytes_to_remove
                 section.SizeOfRawData -= section_bytes_to_remove
                 pe.OPTIONAL_HEADER.SizeOfImage -= section_bytes_to_remove
-                result += "Bloated section reduced." + "\n"
+                log_message("Bloated section reduced.")
                 return pe, end_of_real_data, result
             # Handle specific bloated sections
             if biggest_section == None:
@@ -169,17 +197,19 @@ def check_section_entropy(pe: pefile.PE, end_of_real_data) -> Tuple[pefile.PE, i
             # resource is not at the end of an executable.
             # TODO: Handle other tomfoolery required when resource 
             # is not at end of executable.
-            result += "Bloat was located in the resource section.\n\
-                        Removing bloat.." + "\n"
+            log_message('''
+Bloat was located in the resource section. Removing bloat.. \n
+''')
             pe, end_of_real_data = remove_resources(pe, biggest_section)
             return pe, end_of_real_data, result
         elif biggest_section.Name.decode() == ".text\x00\x00\x00":
             # Data stored in the .text section is often a .NET Resource. The following checks
             # to confirm it is .NET and then drops the resources.
             if pe.OPTIONAL_HEADER.DATA_DIRECTORY[14].Size:
-                result += '''Bloat was detected in the text section.\n
-                "Bloat is likely in a .NET Resource\n\
-                This use case cannot be processed at this time.\n'''
+                log_message('''
+Bloat was detected in the text section. Bloat is likely in a .NET Resource 
+This use case cannot be processed at this time.\n
+''')
             return pe, end_of_real_data, result
         
 def trim_junk(pe: pefile.PE, end_of_real_data) -> int:
@@ -249,8 +279,8 @@ def process_pe(pe: pefile.PE, out_path: str, unsafe_processing: bool,
                                                         signature_size, 
                                                         beginning_file_size)
     if signature_abnormality:
-        log_message("We detected data after the signature.\
-                     This is abnormal.\nRemoving signature and extra data...")
+        log_message('''
+We detected data after the signature. This is abnormal. Removing signature and extra data...''')
         end_of_real_data = signature_address
     # Handle Overlays: this includes packers and overlays which are completely junk
     elif pe.get_overlay_data_start_offset() and signature_size < len(pe.get_overlay()):
@@ -286,7 +316,9 @@ Debloat without the "--unsafe" parameter."""
     else:
         # In order to solve some use cases, we will find the biggest section 
         # within the binary.
-        pe, end_of_real_data, result = check_section_entropy(pe, end_of_real_data)
+        pe, end_of_real_data, result = check_section_entropy(pe, 
+                                                             end_of_real_data, 
+                                                             log_message=log_message)
         log_message(result)
     # All processing is done. Report results.
     if end_of_real_data == beginning_file_size:

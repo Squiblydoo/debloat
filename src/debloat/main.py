@@ -33,9 +33,10 @@ def main() -> int:
     try:
         pe = pefile.PE(file_path)
     except Exception:
-        print("Provided file is not an executable! \
-              Please try again with an executable. \
-              Maybe it needs unzipped?")
+        print('''
+Provided file is not an executable! Please try again with an executable. 
+Maybe it needs unzipped?'''
+              )
         return 1
 
     processor.process_pe(pe, 
