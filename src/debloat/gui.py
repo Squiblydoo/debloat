@@ -70,14 +70,13 @@ class MainWindow(TkinterDnD.Tk):
         '''Process the file at the user provided path.'''
         start_time = time.time()
         file_path = Path(self.pathbox.get())
-        self.output_scrollbox_handler("Processing. Please wait.\n")
+        self.output_scrollbox_handler("Processing. Please wait.")
         try:
             pe = pefile.PE(file_path)
         except Exception:
-            self.output_scrollbox_handler("Provided file is not \
-                                        an executable! Please try again \
-                                        with an executable. Maybe it needs \
-                                        unzipped?\n")
+            self.output_scrollbox_handler('''
+Provided file is not an executable! Please try again 
+with an executable. Maybe it needs unzipped?''')
             self.clear_pathbox()
             return
         out_path = file_path.parent \
