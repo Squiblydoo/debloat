@@ -39,7 +39,7 @@ Maybe it needs unzipped?'''
               )
         return 1
 
-    processor.process_pe(pe, 
+    debloat.processor.process_pe(pe, 
                         out_path=str(out_path), unsafe_processing=args.unsafe,
                         log_message=print
                         )
