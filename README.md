@@ -9,7 +9,7 @@ Being built with Python, the code and logic is easily accessible for others to t
 
 Compiled binaries have already been included in the [Releases](https://github.com/Squiblydoo/debloat/releases/).
 
-The CLI version can be installed using `pip install debloat`. 
+The debloat can installed using `pip install debloat`. Use `debloat` to launch the CLI and `debloat-gui` to launch the GUI.
 
 For advanced users, Debloat can also be imported into other scripts and the processing functions can be called individually.
 
@@ -19,7 +19,7 @@ When launched, you can drag and drop bloated file onto the text bar and press th
 Some technical information will be printed to the scrolling textbox and the file without bloat will be written to the directory the file was pulled from.
 Sound easy? It is!
 
-Running the program should debloat the binary in 30-40 second on average; as long as 120 seconds for more complicated obfuscation methods.
+Running the program should debloat the binary in 30-40 second on average.
 
 <img width="602" alt="Screenshot 2023-01-29 at 2 52 13 PM" src="https://user-images.githubusercontent.com/77356206/215352245-b37091ce-4d58-415c-a7ba-44a9c45bd6f1.png">
 
@@ -31,7 +31,8 @@ The gui can also be launched from the CLI using the command `debloat-gui`.
 
 ## Does it always work?
 Not yet.
-My unscientific guess is that it should work for every 5 of 6 binaries. There are specific usecases I know where it does not work and I am working to implement solutions for those usecases. In situations where it does not work, it may remove too much content from the binary and the binary will return malformed.
+My unscientific guess is that it should work for every 7 of 8 binaries. There are specific usecases I know where it does not work and I am working to implement solutions for those usecases. 
+In previous versions, `debloat` could accidentally remove too much of the binary. That is no longer the case unless you use the "-unsafe" switch. If you ever need this switch, consider sharing the sample for additional analysis.
 
 ## Use Cases (Images from [Malcat](https://malcat.fr/))
 ### Full support
@@ -39,7 +40,7 @@ My unscientific guess is that it should work for every 5 of 6 binaries. There ar
 In the image below, the bloat has been appended to the end of the executable. <br>
 ![Screenshot 2023-02-11 at 3 32 36 PM](https://user-images.githubusercontent.com/77356206/218279963-00780b59-8227-47dd-a0af-41096f6ae17b.png)
 
-- [X] Signed executable packed with UPX.<br>
+- [X] Signed or Unsigned Packed executable.<br>
 In the image below, the bloat has been appended to the executable after packing. <br>
 ![Screenshot 2023-02-11 at 3 44 10 PM](https://user-images.githubusercontent.com/77356206/218280433-6dbcf51a-68c8-48e1-a89a-ad0b818a0afc.png)
 
@@ -47,12 +48,13 @@ In the image below, the bloat has been appended to the executable after packing.
 In the image below, the bloat is identified as in the .rsrc section and is removed from the PE.<br>
 ![Screenshot 2023-02-11 at 3 35 21 PM](https://user-images.githubusercontent.com/77356206/218280086-7cd548f8-e16b-4290-9283-a8a848de1419.png)
 
-### Partial Support
-- [ ] Some cases where bloat is added inside a PE Section.<br>
+- [X] Cases where bloat is added inside a PE Section.<br>
 In the image below, the bloat has been included in a PE section named [0]. <br>
 ![Screenshot 2023-02-11 at 3 26 52 PM](https://user-images.githubusercontent.com/77356206/218279753-ed2c9102-482a-4639-aeb1-df8efc9c4e2e.png)
 
-- [ ] Some packer detection
+# Partial Support
+
+- [X] Some packer detection for instances where the binary simply cannot be debloated. For example, NullSoft installers. These can be unpacked with UniExtract2 and do not need debloated.
 
 ### Other use cases
 There are use cases where the tool does not work. However, I plan to solve for them before publishing too much about them.
@@ -85,3 +87,5 @@ Linux<br>
 Batch processing: process all files in a directory and produce a report.
 
 Better support for using processing methods outside of debloat.
+
+Support for debloating without unzipping.
