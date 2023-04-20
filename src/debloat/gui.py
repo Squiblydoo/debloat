@@ -81,7 +81,7 @@ with an executable. Maybe it needs unzipped?''')
             return
         out_path = file_path.parent \
             / f"{file_path.stem}_patched{file_path.suffix}"
-        process_pe(pe,  out_path, self.safe_processing, 
+        debloat.processor.process_pe(pe,  out_path, self.safe_processing, 
                    log_message=self.output_scrollbox_handler)
         self.output_scrollbox_handler("-----Processessing took %s seconds ---\n" \
                                     % round((time.time() - start_time), 2))
