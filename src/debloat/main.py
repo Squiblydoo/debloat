@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 import argparse
 import pefile
-import processor
+import debloat.processor
 
 def main() -> int:
     parser = argparse.ArgumentParser()

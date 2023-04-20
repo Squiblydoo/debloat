@@ -7,7 +7,7 @@ import tkinter.scrolledtext as st
 from typing import Tuple, Optional, Any
 from tkinterdnd2 import DND_FILES, TkinterDnD
 import pefile
-from processor import process_pe
+import debloat.processor
 
 
 class MainWindow(TkinterDnD.Tk):
