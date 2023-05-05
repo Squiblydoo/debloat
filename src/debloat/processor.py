@@ -129,6 +129,7 @@ Removing bloated section...
                 section_end = section.PointerToRawData + section.SizeOfRawData
                 # If the entropy is simply 0.00, there is no data to be 
                 # missed, we won't waste CPU and just drop the whole thing.
+                delta_last_non_junk = 0
                 if section_entropy == 0.00:
                     # To play it safe, we will leave 100 bytes in the 
                     # section. And thus mark the end of the binary as 
