@@ -72,7 +72,9 @@ class MainWindow(TkinterDnD.Tk):
         file_path = Path(self.pathbox.get())
         self.output_scrollbox_handler("Processing. Please wait.")
         try:
-            pe = pefile.PE(file_path)
+            with open(file_path, "rb") as bloated_file:
+                pe_data = bloated_file.read()
+            pe = pefile.PE(data=pe_data, fast_load=True)
         except Exception:
             self.output_scrollbox_handler('''
 Provided file is not an executable! Please try again 

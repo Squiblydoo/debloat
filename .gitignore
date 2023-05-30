@@ -4,3 +4,4 @@ dist/
 virt/
 src/debloat.egg-info/
 src/debloat/dist
+src/debloat/.vscode
