@@ -31,7 +31,9 @@ def main() -> int:
             / f"{file_path.stem}_patched{file_path.suffix}"
 
     try:
-        pe = pefile.PE(file_path)
+        with open(file_path, "rb") as bloated_file:
+            pe_data = bloated_file.read()
+        pe = pefile.PE(data=pe_data, fast_load=True)
     except Exception:
         print('''
 Provided file is not an executable! Please try again with an executable. 

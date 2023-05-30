@@ -1,3 +1,26 @@
+1.4.1
+- Fixed loading PE in GUI
+
+1.4.0
+- Fixed headers in a few use cases where I had missed them before.
+- Fixed removing resource method. Works properly now.
+- Fixed instance where the dynamic trim regex could pick up illegal characters
+- Now last_loads PE for better loading time.
+- Now manipuates PE data in the buffer.
+
+1.3.2.2
+- Fixed a bug where the Delta_last_non_junk value could fail to be set in one use case.
+
+1.3.2.1
+- Temporary fix for release version.
+
+1.3.2
+- Added Dynamic Trim for trimming bytes from both the Overlay and bloated sections
+--Dynamic trim identifies the junk and creates a targeted regex to remove it.
+
+- Improved output. 
+-- Output wasn't being updated as the program ran. I now clear the buffer and update the UI after each output message.
+
 1.3.1
 - Fixed required versions in pyproject.toml
 
