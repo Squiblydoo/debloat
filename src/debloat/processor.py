@@ -93,18 +93,22 @@ def handle_signature_abnormality(signature_address: int,
 def check_for_packer(pe: pefile.PE) -> int:
     '''Check overlay bytes for known packers.'''
     packer_header = pe.write()[pe.get_overlay_data_start_offset():pe.get_overlay_data_start_offset() + 30]
-    # TODO This section is being expanded to account for multiple types
-    # of packers. Packers store some important information in the 
-    # overlay that we need to preserve. The intention here is to
-    # find the end of the Packer content based on headers. This may 
-    # result in specific rules for specific headers or may end up 
-    # requiring a genernic method to handle different file types.
-    packer_header_match = re.search(rb"^.\x00\x00\x00\xef\xbe\xad\xdeNullsoftInst",
-                                  packer_header)
-    if packer_header_match:
-        print("Nullsoft Header found. Use the tool UniExtract2 to extract.")
-        nullsoft_header_size = int.from_bytes(packer_header[18:21], "big")
-        return 1
+    # TODO: Evalute any other packers that need special processing.
+
+    # NullSoft is not a packer, but an installer. We will detect this. It cannot be processed at this time
+    NULLSOFT_MAGICS = [
+        # https://nsis.sourceforge.io/Can_I_decompile_an_existing_installer
+        B'\xEF\xBE\xAD\xDE' B'Null' B'soft' B'Inst',   # v1.6
+        B'\xEF\xBE\xAD\xDE' B'Null' B'Soft' B'Inst',   # v1.3
+        B'\xED\xBE\xAD\xDE' B'Null' B'Soft' B'Inst',   # v1.1
+        B'\xEF\xBE\xAD\xDE' B'nsis' B'inst' B'all\0',  # v1.0
+    ]
+
+    for magic in range(len(NULLSOFT_MAGICS)):
+        packer_header_match = re.search(NULLSOFT_MAGICS[magic], packer_header)
+        if packer_header_match:
+             # Future: Handle NSIS installers
+            return 1 # Nullsoft
     return 0
 
 def find_last_section(pe: pefile.PE) -> Optional[pefile.SectionStructure]:
@@ -401,6 +405,7 @@ def trim_junk(bloated_content: bytes, original_size_with_junk: int) -> int:
     junk_match = re.search(rb'^(..)\1{20,}', backward_bloated_content[:600])
     # Second Method: If "not junk_match" check for junk larger than 1 repeating byte
     if not junk_match:
+        chunk_start = 0
         # Brute force check: check to see if there are 1-20 bytes
         # being repeated and feed the number into the regex
         for i in range(300):
@@ -414,7 +419,6 @@ def trim_junk(bloated_content: bytes, original_size_with_junk: int) -> int:
                 # Having found the pattern, we can make the regex efficient
                 # by targeting the pattern using the "targeted_regex"
                 targeted_regex = rb"(" + binascii.hexlify(multibyte_junk_regex.group(1)) + rb")\1{1,}"
-                chunk_start = 0
                 chunk_end = chunk_start
                 while original_size_with_junk > chunk_end:
                     chunk_end = chunk_start + 1000
