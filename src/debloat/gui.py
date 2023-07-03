@@ -9,7 +9,6 @@ from tkinterdnd2 import DND_FILES, TkinterDnD
 import pefile
 import debloat.processor
 
-
 class MainWindow(TkinterDnD.Tk):
     def __init__(self) -> None:
         '''Define main GUI window.'''
@@ -36,10 +35,12 @@ class MainWindow(TkinterDnD.Tk):
 
         # Safe processing value and checkbox: Maybe not even needed?
         self.safe_processing = BooleanVar(value=True)
-        #self.safe_checkbox = Checkbutton(self,
-        #                                text="Only remove bloat when certain (safe)",
-        #                                 variable=self.safe_processing)
-        #self.safe_checkbox.pack()
+        self.safe_checkbox = Checkbutton(self,
+                                        text="Run safe processing (uncheck for unsafe)",
+                                         variable=self.safe_processing)
+        self.safe_checkbox.pack()
+
+        
 
         # Define Scrollbox for output of program.
         self.output_scrollbox = st.ScrolledText(self, 
@@ -83,7 +84,8 @@ with an executable. Maybe it needs unzipped?''')
             return
         out_path = file_path.parent \
             / f"{file_path.stem}_patched{file_path.suffix}"
-        debloat.processor.process_pe(pe,  out_path, self.safe_processing, 
+
+        debloat.processor.process_pe(pe,  out_path, self.safe_processing.get(), 
                    log_message=self.output_scrollbox_handler)
         self.output_scrollbox_handler("-----Processessing took %s seconds ---\n" \
                                     % round((time.time() - start_time), 2))
