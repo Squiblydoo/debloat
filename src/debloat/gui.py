@@ -7,7 +7,7 @@ import tkinter.scrolledtext as st
 from typing import Tuple, Optional, Any
 from tkinterdnd2 import DND_FILES, TkinterDnD
 import pefile
-import debloat.processor
+import processor
 
 class MainWindow(TkinterDnD.Tk):
     def __init__(self) -> None:
@@ -34,11 +34,11 @@ class MainWindow(TkinterDnD.Tk):
         self.process_button.pack(pady=10)
 
         # Safe processing value and checkbox: Maybe not even needed?
-        self.safe_processing = BooleanVar(value=True)
-        self.safe_checkbox = Checkbutton(self,
-                                        text="Run safe processing (uncheck for unsafe)",
-                                         variable=self.safe_processing)
-        self.safe_checkbox.pack()
+        self.unsafe_processing = BooleanVar(value=False)
+        self.unsafe_checkbox = Checkbutton(self,
+                                        text="Check to run unsafe processing",
+                                         variable=self.unsafe_processing)
+        self.unsafe_checkbox.pack()
 
         
 
@@ -85,7 +85,7 @@ with an executable. Maybe it needs unzipped?''')
         out_path = file_path.parent \
             / f"{file_path.stem}_patched{file_path.suffix}"
 
-        debloat.processor.process_pe(pe,  out_path, self.safe_processing.get(), 
+        processor.process_pe(pe,  out_path, self.unsafe_processing.get(), 
                    log_message=self.output_scrollbox_handler)
         self.output_scrollbox_handler("-----Processessing took %s seconds ---\n" \
                                     % round((time.time() - start_time), 2))
