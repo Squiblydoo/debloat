@@ -5,4 +5,4 @@ Windows
 pyinstaller --onefile  --noconsole  --additional-hooks-dir=./hook --icon=debloat.ico gui.py
 
 Linux
-~/.local/bin/pyinstaller --onefile --noconsole --icon=debloat.ico --additional-hooks-dir=./hook --add-binary "/home/redacted/.local/lib/python3.10/site-packages/:." gui.py
+pyinstaller --onefile --noconsole --icon=debloat.ico --collect-all tkinterdnd2 gui.py
