@@ -7,7 +7,7 @@ import tkinter.scrolledtext as st
 from typing import Tuple, Optional, Any
 from tkinterdnd2 import DND_FILES, TkinterDnD
 import pefile
-import processor
+import debloat.processor
 
 class MainWindow(TkinterDnD.Tk):
     def __init__(self) -> None:
@@ -85,7 +85,7 @@ with an executable. Maybe it needs unzipped?''')
         out_path = file_path.parent \
             / f"{file_path.stem}_patched{file_path.suffix}"
 
-        processor.process_pe(pe,  out_path, self.unsafe_processing.get(), 
+        debloat.processor.process_pe(pe,  out_path, self.unsafe_processing.get(), 
                    log_message=self.output_scrollbox_handler)
         self.output_scrollbox_handler("-----Processessing took %s seconds ---\n" \
                                     % round((time.time() - start_time), 2))
