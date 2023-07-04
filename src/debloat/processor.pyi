@@ -5,28 +5,6 @@ from typing import Any, Callable, Optional, Tuple
 
 PACKER: Any
 
-class RSRC(enum.IntEnum):
-    CURSOR: int
-    BITMAP: int
-    ICON: int
-    MENU: int
-    DIALOG: int
-    STRING: int
-    FONTDIR: int
-    FONT: int
-    ACCELERATOR: int
-    RCDATA: int
-    MESSAGETABLE: int
-    ICON_GROUP: int
-    VERSION: int
-    DLGINCLUDE: int
-    PLUGPLAY: int
-    VXD: int
-    ANICURSOR: int
-    ANIICON: int
-    HTML: int
-    MANIFEST: int
-
 def readable_size(value: int) -> str: ...
 def write_patched_file(out_path: str, pe: pefile.PE, end_of_real_data: int) -> Tuple[int, str]: ...
 def handle_signature_abnormality(signature_address: int, signature_size: int, beginning_file_size: int) -> bool: ...
