@@ -17,39 +17,15 @@ import zlib
 from pefile import Structure, SectionStructure, DIRECTORY_ENTRY
 from typing import Generator, Iterable, Optional
 
+import debloat.utilities.rsrc as rsrc
+
 _KB = 1000
 _MB = _KB * _KB
 
 PACKER = {
     1 : "Nullsoft"
 }
-import enum
 
-class RSRC(enum.IntEnum):
-    CURSOR        = 0x01  # noqa
-    BITMAP        = 0x02  # noqa
-    ICON          = 0x03  # noqa
-    MENU          = 0x04  # noqa
-    DIALOG        = 0x05  # noqa
-    STRING        = 0x06  # noqa
-    FONTDIR       = 0x07  # noqa
-    FONT          = 0x08  # noqa
-    ACCELERATOR   = 0x09  # noqa
-    RCDATA        = 0x0A  # noqa
-    MESSAGETABLE  = 0x0B  # noqa
-    ICON_GROUP    = 0x0E  # noqa
-    VERSION       = 0x10  # noqa
-    DLGINCLUDE    = 0x11  # noqa
-    PLUGPLAY      = 0x13  # noqa
-    VXD           = 0x14  # noqa
-    ANICURSOR     = 0x15  # noqa
-    ANIICON       = 0x16  # noqa
-    HTML          = 0x17  # noqa
-    MANIFEST      = 0x18  # noqa
-
-    def __str__(self):
-        return self.name
-        
 def readable_size(value: int) -> str:
     '''Return bytes in human readable format.'''
     if value <= 1024:
@@ -93,18 +69,22 @@ def handle_signature_abnormality(signature_address: int,
 def check_for_packer(pe: pefile.PE) -> int:
     '''Check overlay bytes for known packers.'''
     packer_header = pe.write()[pe.get_overlay_data_start_offset():pe.get_overlay_data_start_offset() + 30]
-    # TODO This section is being expanded to account for multiple types
-    # of packers. Packers store some important information in the 
-    # overlay that we need to preserve. The intention here is to
-    # find the end of the Packer content based on headers. This may 
-    # result in specific rules for specific headers or may end up 
-    # requiring a genernic method to handle different file types.
-    packer_header_match = re.search(rb"^.\x00\x00\x00\xef\xbe\xad\xdeNullsoftInst",
-                                  packer_header)
-    if packer_header_match:
-        print("Nullsoft Header found. Use the tool UniExtract2 to extract.")
-        nullsoft_header_size = int.from_bytes(packer_header[18:21], "big")
-        return 1
+    # TODO: Evalute any other packers that need special processing.
+
+    # NullSoft is not a packer, but an installer. We will detect this. It cannot be processed at this time
+    NULLSOFT_MAGICS = [
+        # https://nsis.sourceforge.io/Can_I_decompile_an_existing_installer
+        B'\xEF\xBE\xAD\xDE' B'Null' B'soft' B'Inst',   # v1.6
+        B'\xEF\xBE\xAD\xDE' B'Null' B'Soft' B'Inst',   # v1.3
+        B'\xED\xBE\xAD\xDE' B'Null' B'Soft' B'Inst',   # v1.1
+        B'\xEF\xBE\xAD\xDE' B'nsis' B'inst' B'all\0',  # v1.0
+    ]
+
+    for magic in range(len(NULLSOFT_MAGICS)):
+        packer_header_match = re.search(NULLSOFT_MAGICS[magic], packer_header)
+        if packer_header_match:
+             # Future: Handle NSIS installers
+            return 1 # Nullsoft
     return 0
 
 def find_last_section(pe: pefile.PE) -> Optional[pefile.SectionStructure]:
@@ -222,9 +202,8 @@ def adjust_offsets(pe: pefile.PE, gap_offset: int, gap_size: int):
     return pe
     
 
-
 def refinery_strip(pe: pefile.PE, data: memoryview, block_size=_MB) -> int:
-    threshold = 2
+    threshold = 1
     alignment = pe.OPTIONAL_HEADER.FileAlignment
     data_overhang = len(data) % alignment
     result = data_overhang
@@ -276,8 +255,8 @@ def refinery_trim_resources(pe: pefile.PE, pe_data: bytearray) -> int:
             name = getattr(entry, 'name')
             numeric_id = getattr(entry, 'id')
             if not name:
-                if level == 0 and numeric_id in iter(RSRC):
-                    name = RSRC(entry.id)
+                if level == 0 and numeric_id in iter(rsrc.RSRC):
+                    name = rsrc.RSRC(entry.id)
                 elif numeric_id is not None:
                     name = str(numeric_id)
             name = name and str(name) or '?'
@@ -400,6 +379,7 @@ def trim_junk(bloated_content: bytes, original_size_with_junk: int) -> int:
     # Check against 200 bytes, if successful, calculate full match.
     junk_match = re.search(rb'^(..)\1{20,}', backward_bloated_content[:600])
     # Second Method: If "not junk_match" check for junk larger than 1 repeating byte
+    chunk_start = 0
     if not junk_match:
         # Brute force check: check to see if there are 1-20 bytes
         # being repeated and feed the number into the regex
@@ -414,7 +394,6 @@ def trim_junk(bloated_content: bytes, original_size_with_junk: int) -> int:
                 # Having found the pattern, we can make the regex efficient
                 # by targeting the pattern using the "targeted_regex"
                 targeted_regex = rb"(" + binascii.hexlify(multibyte_junk_regex.group(1)) + rb")\1{1,}"
-                chunk_start = 0
                 chunk_end = chunk_start
                 while original_size_with_junk > chunk_end:
                     chunk_end = chunk_start + 1000
@@ -513,7 +492,8 @@ If file is a Nullsoft executable, but was not detected, the original file can
 be unpacked with the tool "UniExtract2".
                     """)
                     last_section = find_last_section(pe)
-                    end_of_real_data = last_section.PointerToRawData + last_section.SizeOfRawData 
+                    end_of_real_data = last_section.PointerToRawData + last_section.SizeOfRawData
+                    pe_data = pe_data[:end_of_real_data] 
                 else:
                     log_message("""
 Overlay was unable to be trimmed. Try unpacking with UniExtract2 or re-running 
