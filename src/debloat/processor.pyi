@@ -1,9 +1,9 @@
-import enum
 import pefile
+from _typeshed import Incomplete
 from pefile import Structure as Structure
-from typing import Any, Callable, Optional, Tuple
+from typing import Callable, Optional, Tuple
 
-PACKER: Any
+PACKER: Incomplete
 
 def readable_size(value: int) -> str: ...
 def write_patched_file(out_path: str, pe: pefile.PE, end_of_real_data: int) -> Tuple[int, str]: ...
