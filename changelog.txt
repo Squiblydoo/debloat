@@ -1,3 +1,8 @@
+1.4.2
+- Added checkbox for unsafe processing in GUI
+- Moved RSRC class out of processor into utilities
+- Fixed bug where chunk_start could fail to be given a value with the result that the program would stop functioning but not inform the user. Better error handling in this case to come.
+
 1.4.1
 - Fixed loading PE in GUI
 

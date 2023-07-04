@@ -379,8 +379,8 @@ def trim_junk(bloated_content: bytes, original_size_with_junk: int) -> int:
     # Check against 200 bytes, if successful, calculate full match.
     junk_match = re.search(rb'^(..)\1{20,}', backward_bloated_content[:600])
     # Second Method: If "not junk_match" check for junk larger than 1 repeating byte
+    chunk_start = 0
     if not junk_match:
-        chunk_start = 0
         # Brute force check: check to see if there are 1-20 bytes
         # being repeated and feed the number into the regex
         for i in range(300):
