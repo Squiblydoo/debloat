@@ -36,7 +36,7 @@ class MainWindow(TkinterDnD.Tk):
         # Safe processing value and checkbox: Maybe not even needed?
         self.unsafe_processing = BooleanVar(value=False)
         self.unsafe_checkbox = Checkbutton(self,
-                                        text="Check to run unsafe processing",
+                                        text="Check to run last ditch effort processing",
                                          variable=self.unsafe_processing)
         self.unsafe_checkbox.pack()
 

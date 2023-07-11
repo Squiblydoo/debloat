@@ -15,9 +15,9 @@ def main() -> int:
                         help="Output location", 
                         type=Path,
                         required=False)
-    parser.add_argument("-u", "--unsafe", 
+    parser.add_argument("-u", "--last-ditch-effort", dest="unsafe",
                         help="""
-    Disable safe processing. With unsafe processing, Debloat may remove the
+    Run last-ditch-effort processing. In this mode Debloat may remove the
     whole PE Overlay as a last resort if no smarter method works.
                             """,
                         action='store_true', default=False)

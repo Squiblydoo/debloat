@@ -38,8 +38,7 @@ def readable_size(value: int) -> str:
         return '%.1f GB' % (float(value) / 1024.0 / 1024.0 / 1024.0)
 
 def write_patched_file(out_path: str,
-                        pe: pefile.PE, 
-                        end_of_real_data: int) -> Tuple[int, str]:
+                        pe: pefile.PE) -> Tuple[int, str]:
     '''Writes the patched file to disk.
     
     Keyword Arguments:
@@ -323,14 +322,9 @@ def check_section_compression(pe: pefile.PE, pe_data: bytearray, end_of_real_dat
         if biggest_section.Name.decode() == ".rsrc\x00\x00\x00":
             # Get biggest resource or resources and drop them from the 
             # Resource table
-            # TODO: recalculate PE header in situations where the 
-            # resource is not at the end of an executable.
-            # TODO: Handle other tomfoolery required when resource 
-            # is not at end of executable.
             log_message('''
 Bloat was located in the resource section. Removing bloat.. 
 ''')
-            
             bytes_removed = remove_resources(pe, pe_data)
             end_of_real_data =- bytes_removed
             return end_of_real_data, result
@@ -342,34 +336,32 @@ Bloat was located in the resource section. Removing bloat..
 Bloat was detected in the text section. Bloat is likely in a .NET Resource 
 This use case cannot be processed at this time. ''')
             return end_of_real_data, result
-                
-        # The use cases covered by this section are at the end of 
-        # the binary. In my experience, the bloated sections are 
-        # usually at the end unless they are bloat from .NET Resources.
         if biggest_uncompressed > 3000:
             log_message('''
-The compression ratio is indicative of a bloated section.
+The compression ratio of ''' + biggest_section.Name.decode() + ''' is indicative of a bloated section.
 ''', end="", flush=True)
             # Get the size of the section.
-            section_end = section.PointerToRawData + section.SizeOfRawData
-            original_section_size = section.SizeOfRawData
-            section_data = pe_data[section.PointerToRawData:section_end]
-            delta_last_non_junk = trim_junk(section_data, original_section_size)
-            pe_data[section.PointerToRawData + delta_last_non_junk:section_end] = []
+            biggest_section_end = biggest_section.PointerToRawData + biggest_section.SizeOfRawData
+            original_section_size = biggest_section.SizeOfRawData
+            biggest_section_data = pe_data[biggest_section.PointerToRawData:biggest_section_end]
+
+            delta_last_non_junk = trim_junk(pe, biggest_section_data, original_section_size)
+            # Remove the junk from the section.
+            pe_data[biggest_section.PointerToRawData + delta_last_non_junk:biggest_section_end] = []
             section_bytes_to_remove = original_section_size - delta_last_non_junk
             end_of_real_data =  end_of_real_data - section_bytes_to_remove
-            # This will update the last section header, SizeOfRawData, SizeOfImage.
-            pe.sections[pe.sections.index(biggest_section)].section_max_addr -= section_bytes_to_remove
-            pe.sections[pe.sections.index(biggest_section)].SizeOfRawData -= section_bytes_to_remove
-            #pe.sections[pe.sections.index(biggest_section)].Misc_VirtualSize -= section_bytes_to_remove
-            #pe.OPTIONAL_HEADER.SizeOfImage -= section_bytes_to_remove
+            # Adjust all offsets for the file.
+            adjust_offsets(pe, biggest_section.PointerToRawData, section_bytes_to_remove)
             log_message("Bloated section reduced.")
             return end_of_real_data, result
             
        
         
-def trim_junk(bloated_content: bytes, original_size_with_junk: int) -> int:
-    ''' Attempt multiple methods or removing junk from overlay.'''
+def trim_junk(pe: pefile.PE, bloated_content: bytes, 
+              original_size_with_junk: int) -> int:
+    '''Attempts multiple methods to trim junk from the end of a section.'''
+    alignment = pe.OPTIONAL_HEADER.FileAlignment
+
     backward_bloated_content = bloated_content[::-1]
     # Regex Explained:
     # Match raw bytes that are repeated more than 20 times at the end
@@ -430,6 +422,7 @@ def trim_junk(bloated_content: bytes, original_size_with_junk: int) -> int:
         if junk_to_remove < original_size_with_junk / 2:
             chunk_start = targeted_junk_match.end(0)
             chunk_end = chunk_start
+            unmatched_portion = 0
             while original_size_with_junk > chunk_end:
                 chunk_end = chunk_start + 200
                 repeated_junk_match = re.search(rb'(..)\1{20,}', 
@@ -444,6 +437,12 @@ def trim_junk(bloated_content: bytes, original_size_with_junk: int) -> int:
         else:
             junk_to_remove = int(junk_to_remove / 2)
         delta_last_non_junk -= junk_to_remove
+    
+    # The returned size must account for the file alignment.
+    # We will make sure it is aligned by adding bytes.
+    not_aligned = delta_last_non_junk % alignment
+    delta_last_non_junk = delta_last_non_junk - not_aligned
+
     return delta_last_non_junk  
 
 def process_pe(pe: pefile.PE, out_path: str, unsafe_processing: bool,
@@ -480,16 +479,14 @@ The original file cannot be debloated. It must be unpacked with a tool such as U
             log_message("Packer not identified. Attempting dynamic trim...")
             last_section = find_last_section(pe)
             overlay = pe_data[last_section.PointerToRawData + last_section.SizeOfRawData:]
-            end_of_real_data = trim_junk(overlay, end_of_real_data)
+            end_of_real_data = trim_junk(pe, overlay, end_of_real_data)
             pe_data = pe_data[:end_of_real_data]
             if end_of_real_data == beginning_file_size:
                 if unsafe_processing is True:
                     log_message("""
-"Unsafe" switch detected. Running unsafe debloat technique:\n
-This is the last resort of removing the whole overlay: this works in some 
-cases, but can remove critical content. 
-If file is a Nullsoft executable, but was not detected, the original file can 
-be unpacked with the tool "UniExtract2".
+"Last ditch" switch detected. Running last ditch debloat technique:\n
+This is the last resort that removes the whole overlay: this works in cases where the overlay lacks a pattern.
+However, if the file does not run after this, it is in indicator that this method removed critical data.
                     """)
                     last_section = find_last_section(pe)
                     end_of_real_data = last_section.PointerToRawData + last_section.SizeOfRawData
@@ -497,7 +494,7 @@ be unpacked with the tool "UniExtract2".
                 else:
                     log_message("""
 Overlay was unable to be trimmed. Try unpacking with UniExtract2 or re-running 
-Debloat with the "--unsafe" parameter."""
+Debloat with the "--last-ditch" parameter."""
                                 )
     # Handle bloated sections
     # TODO: break up into functions
@@ -516,10 +513,9 @@ Email: Squiblydoo@pm.me
 Twitter: @SquiblydooBlog.
                     """)
     else:
-        pe.__data__ =pe_data
+        pe.__data__ = pe_data
         final_filesize, new_pe_name = write_patched_file(out_path,
-                                                         pe, 
-                                                         end_of_real_data)
+                                                         pe)
         reduction_calculation = round(((beginning_file_size \
                                         - final_filesize) \
                                         / beginning_file_size) * 100, 2)
