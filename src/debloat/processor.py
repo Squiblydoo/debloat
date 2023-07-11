@@ -1,8 +1,9 @@
 """
 This file handles the processing of binaries and helper methods.
 
-Three methods are from https://github.com/binref/refinery 
-Copyright 2019 Jesko Hüttenhain used under the 3-Clause BSD License 
+Three methods rely heavily on parts of Binary Refinery
+https://github.com/binref/refinery 
+Copyright 2019 Jesko Hüttenhain under the 3-Clause BSD License 
 The methods are:
 refinery_strip()
 adjust_offsets()
