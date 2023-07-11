@@ -32,7 +32,8 @@ The gui can also be launched from the CLI using the command `debloat-gui`.
 ## Does it always work?
 Not yet.
 My unscientific guess is that it should work for every 7 of 8 binaries. There are specific usecases I know where it does not work and I am working to implement solutions for those usecases. 
-In previous versions, `debloat` could accidentally remove too much of the binary. That is no longer the case unless you use the "-unsafe" switch. If you ever need this switch, consider sharing the sample for additional analysis.
+
+In previous versions, `debloat` could accidentally remove too much of the binary. That is no longer the case unless you use the "--last-ditch-effort" switch. If you ever need this switch, consider sharing the sample for additional analysis. This option has now been added to the GUI. Functionally, what the function does is it will remove the whole overlay, if there is one. In some cases this is necessary as no pattern for the junk was found---this is most commonly the case in samples that do not compress well.
 
 ## Use Cases (Images from [Malcat](https://malcat.fr/))
 ### Full support
@@ -66,9 +67,10 @@ There appear to be a limited number of tools to easily process bloated executabl
 
 [Pecheck](https://github.com/DidierStevens/DidierStevensSuite/blob/master/pecheck.py) has been developed over 14+ years and has some confusing commandline options. The option to remove bloated content is not the primary function of the script. Pecheck has to be combined with another tool ([disitool](https://blog.didierstevens.com/programs/disitool/)) in order to handle signed executables. In my experience, there are other times where pecheck can get confused and return an executable twice the size of the original bloated executable. All these factors seem OK if you are handling a small number of binaries, but as the number of binaries and methods increase, a tool specific to removing bloat is needed.
 
-There are good solid manual methods to remove bloat from binaries, but these methods can be tedious and not all analysts have the skills to do this. This tool removes the burden of needing to know how to manually remove bloat. Additionally, it allows for better scale. The principles used in the script allow allow for better scale if automation is desired.\*
+[Binary Refinery](https://github.com/binref/refinery) is an amazing tool. It was written with the intention of being a [CyberChef](https://github.com/gchq/CyberChef) of the commandline. While both tools are amazing, they both have a shortcoming that requires the user to know what formulas should be applied. 
 
-\* Note: If automation is desired, I recommend re-writing these concepts in C/C++ and not Python.
+There are good solid manual methods to remove bloat from binaries, but these methods can be tedious and not all analysts have the skills to do this. This tool removes the burden of needing to know how to manually remove bloat. Additionally, it allows for better scale. The principles used in the script allow allow for better scale if automation is desired.
+
 
 ## How to build? 
 Follow the build commands appropriate to your platform. The main difference between build commands is the format of the icon.
