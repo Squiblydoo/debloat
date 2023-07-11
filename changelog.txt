@@ -1,3 +1,8 @@
+1.4.3
+- Fixed a logic bug where debloating a section did not debloat the proper section.
+    - This worked previously when the bloated section was the last section
+- Finished a TODO item: namely, change all the offsets in the sections when the bloated section wasn't the last section of the binary.
+
 1.4.2
 - Added checkbox for unsafe processing in GUI
 - Moved RSRC class out of processor into utilities
