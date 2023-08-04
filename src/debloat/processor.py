@@ -2,8 +2,8 @@
 This file handles the processing of binaries and helper methods.
 
 Three methods rely heavily on parts of Binary Refinery
-https://github.com/binref/refinery 
-Copyright 2019 Jesko Hüttenhain under the 3-Clause BSD License 
+https://github.com/binref/refinery
+Copyright 2019 Jesko Hüttenhain under the 3-Clause BSD License
 The methods are:
 refinery_strip()
 adjust_offsets()
@@ -41,7 +41,7 @@ def readable_size(value: int) -> str:
 def write_patched_file(out_path: str,
                         pe: pefile.PE) -> Tuple[int, str]:
     '''Writes the patched file to disk.
-    
+
     Keyword Arguments:
     out_path -- the path and file name to write
     pe -- the pefile that is being processed
@@ -52,7 +52,7 @@ def write_patched_file(out_path: str,
         return final_filesize, out_path
 
 def handle_signature_abnormality(signature_address: int,
-                                signature_size: int, 
+                                signature_size: int,
                                 beginning_file_size: int) -> bool:
     '''Remove all bytes after a PE signature'''
     # If the signature_address is 0, there was no original signature.
@@ -97,12 +97,12 @@ def find_last_section(pe: pefile.PE) -> Optional[pefile.SectionStructure]:
     return last_section
 
 def get_signature_info(pe: pefile.PE) -> Tuple[int, int]:
-    '''Remove PE signature and update header.''' 
+    '''Remove PE signature and update header.'''
     signature_address = pe.OPTIONAL_HEADER.DATA_DIRECTORY[pefile.DIRECTORY_ENTRY['IMAGE_DIRECTORY_ENTRY_SECURITY']].VirtualAddress
     signature_size = pe.OPTIONAL_HEADER.DATA_DIRECTORY[pefile.DIRECTORY_ENTRY['IMAGE_DIRECTORY_ENTRY_SECURITY']].Size
     pe.OPTIONAL_HEADER.DATA_DIRECTORY[pefile.DIRECTORY_ENTRY['IMAGE_DIRECTORY_ENTRY_SECURITY']].VirtualAddress = 0
     pe.OPTIONAL_HEADER.DATA_DIRECTORY[pefile.DIRECTORY_ENTRY['IMAGE_DIRECTORY_ENTRY_SECURITY']].Size = 0
-    
+
     return signature_address, signature_size
 
 
@@ -186,7 +186,7 @@ def adjust_offsets(pe: pefile.PE, gap_offset: int, gap_size: int):
             'OffsetModuleName',
             'PointerToRawData',
         ))
-        
+
         for attribute in (
             'CvHeaderOffset',
             'OffsetIn2Qwords',
@@ -200,7 +200,7 @@ def adjust_offsets(pe: pefile.PE, gap_offset: int, gap_size: int):
 
     section.SizeOfRawData = new_section_size
     return pe
-    
+
 
 def refinery_strip(pe: pefile.PE, data: memoryview, block_size=_MB) -> int:
     threshold = 1
@@ -210,7 +210,7 @@ def refinery_strip(pe: pefile.PE, data: memoryview, block_size=_MB) -> int:
 
     if not data:
         return 0
-    
+
     if 0 < threshold < 1:
         def compression_ratio(offset: int):
             ratio = len(zlib.compress(data[:offset], level=1))
@@ -268,7 +268,7 @@ def refinery_trim_resources(pe: pefile.PE, pe_data: bytearray) -> int:
             if struct.Size <= size_limit:
                 continue
             yield name, struct
-    
+
     RSRC_INDEX = DIRECTORY_ENTRY['IMAGE_DIRECTORY_ENTRY_RESOURCE']
     pe.parse_data_directories(directories=[RSRC_INDEX])
 
@@ -291,14 +291,14 @@ def refinery_trim_resources(pe: pefile.PE, pe_data: bytearray) -> int:
 
     pe.OPTIONAL_HEADER.DATA_DIRECTORY[RSRC_INDEX].Size -= size_removed
     return size_removed
-        
-    
+
+
 
 def remove_resources(pe: pefile.PE, pe_data: bytearray) -> Tuple[bytearray, int]:
     trimmed = refinery_trim_resources(pe, pe_data)
     return trimmed
 
-def check_section_compression(pe: pefile.PE, pe_data: bytearray, end_of_real_data, 
+def check_section_compression(pe: pefile.PE, pe_data: bytearray, end_of_real_data,
                           log_message: Callable[[str], None]) -> Tuple[pefile.PE, int, str]:
         biggest_section = None
         biggest_uncompressed = int
@@ -311,7 +311,7 @@ def check_section_compression(pe: pefile.PE, pe_data: bytearray, end_of_real_dat
             uncompressed_section_size = section.SizeOfRawData
             section_compression_ratio = uncompressed_section_size / compressed_section_size * 100
             log_message("Section: "  + section_name, end="\t", flush=True)
-            log_message(" Compression Ratio: " + str(round(section_compression_ratio, 2)) +"%", end="\t",flush=True) 
+            log_message(" Compression Ratio: " + str(round(section_compression_ratio, 2)) +"%", end="\t",flush=True)
             log_message("Size of section: " + readable_size(section.SizeOfRawData) +".",flush=True)
             if biggest_section == None:
                 biggest_section = section
@@ -321,10 +321,10 @@ def check_section_compression(pe: pefile.PE, pe_data: bytearray, end_of_real_dat
                 biggest_uncompressed = section_compression_ratio
         # Handle specific bloated sections
         if biggest_section.Name.decode() == ".rsrc\x00\x00\x00":
-            # Get biggest resource or resources and drop them from the 
+            # Get biggest resource or resources and drop them from the
             # Resource table
             log_message('''
-Bloat was located in the resource section. Removing bloat.. 
+Bloat was located in the resource section. Removing bloat..
 ''')
             bytes_removed = remove_resources(pe, pe_data)
             end_of_real_data =- bytes_removed
@@ -334,7 +334,7 @@ Bloat was located in the resource section. Removing bloat..
             # to confirm it is .NET and then drops the resources.
             if pe.OPTIONAL_HEADER.DATA_DIRECTORY[14].Size:
                 log_message('''
-Bloat was detected in the text section. Bloat is likely in a .NET Resource 
+Bloat was detected in the text section. Bloat is likely in a .NET Resource
 This use case cannot be processed at this time. ''')
             return end_of_real_data, result
         if biggest_uncompressed > 3000:
@@ -355,10 +355,10 @@ The compression ratio of ''' + biggest_section.Name.decode() + ''' is indicative
             adjust_offsets(pe, biggest_section.PointerToRawData, section_bytes_to_remove)
             log_message("Bloated section reduced.")
             return end_of_real_data, result
-            
-       
-        
-def trim_junk(pe: pefile.PE, bloated_content: bytes, 
+
+
+
+def trim_junk(pe: pefile.PE, bloated_content: bytes,
               original_size_with_junk: int) -> int:
     '''Attempts multiple methods to trim junk from the end of a section.'''
     alignment = pe.OPTIONAL_HEADER.FileAlignment
@@ -366,7 +366,7 @@ def trim_junk(pe: pefile.PE, bloated_content: bytes,
     backward_bloated_content = bloated_content[::-1]
     # Regex Explained:
     # Match raw bytes that are repeated more than 20 times at the end
-    # of a binary. 
+    # of a binary.
     delta_last_non_junk = original_size_with_junk
     # First Method: Trims 1 repeating byte.
     # Check against 200 bytes, if successful, calculate full match.
@@ -380,7 +380,7 @@ def trim_junk(pe: pefile.PE, bloated_content: bytes,
             # Regex Explained:
             # Starting at the end of the PE, check for repeated bytes.
             # This indicates junk bytes in the overlay. Match that set
-            # of repeated bytes 1 or more times. 
+            # of repeated bytes 1 or more times.
             junk_regex = rb"^(..{" + bytes(str(i), "utf-8") + rb"})\1{2,}"
             multibyte_junk_regex = re.search(junk_regex, backward_bloated_content[:1000])
             if multibyte_junk_regex:
@@ -390,7 +390,7 @@ def trim_junk(pe: pefile.PE, bloated_content: bytes,
                 chunk_end = chunk_start
                 while original_size_with_junk > chunk_end:
                     chunk_end = chunk_start + 1000
-                    targeted_multibyte_junk_regex = re.search(targeted_regex, 
+                    targeted_multibyte_junk_regex = re.search(targeted_regex,
                                                               binascii.hexlify(backward_bloated_content[chunk_start:chunk_end]))
                     if targeted_multibyte_junk_regex:
                         chunk_start += targeted_multibyte_junk_regex.end(0)
@@ -399,17 +399,17 @@ def trim_junk(pe: pefile.PE, bloated_content: bytes,
                         # If the targeted_multibyte_junk_regex does not
                         # return anything, that indicates the previous loop
                         # had content which did not match. We'll use that
-                        # to help ensure we do not remove too much of the file. 
-                        chunk_start += unmatched_portion 
+                        # to help ensure we do not remove too much of the file.
+                        chunk_start += unmatched_portion
                         break
                 break
                 # It was determined that data cannot be removed any more
                 # from the chunk_start. But the value of chunk_start
                 # now tells us how much data we can safely remove.
-        junk_to_remove = chunk_start  
+        junk_to_remove = chunk_start
         #junk_to_remove = int(junk_to_remove)
         delta_last_non_junk -= junk_to_remove
-    # Third Method: check for a series of one repeated byte. 
+    # Third Method: check for a series of one repeated byte.
     # Junk was identified. A new size is assigned and returned.
     else:
         targeted_regex = rb""+ binascii.hexlify(junk_match.string) + rb"{1,}"
@@ -426,7 +426,7 @@ def trim_junk(pe: pefile.PE, bloated_content: bytes,
             unmatched_portion = 0
             while original_size_with_junk > chunk_end:
                 chunk_end = chunk_start + 200
-                repeated_junk_match = re.search(rb'(..)\1{20,}', 
+                repeated_junk_match = re.search(rb'(..)\1{20,}',
                                                 binascii.hexlify(backward_bloated_content[chunk_start:chunk_end]))
                 if repeated_junk_match:
                     chunk_start += repeated_junk_match.end(0)
@@ -434,32 +434,32 @@ def trim_junk(pe: pefile.PE, bloated_content: bytes,
                 else:
                     chunk_start += unmatched_portion
                     break
-            junk_to_remove = chunk_start 
+            junk_to_remove = chunk_start
         else:
             junk_to_remove = int(junk_to_remove / 2)
         delta_last_non_junk -= junk_to_remove
-    
+
     # The returned size must account for the file alignment.
     # We will make sure it is aligned by adding bytes.
     not_aligned = delta_last_non_junk % alignment
     delta_last_non_junk = delta_last_non_junk - not_aligned
 
-    return delta_last_non_junk  
+    return delta_last_non_junk
 
 def process_pe(pe: pefile.PE, out_path: str, unsafe_processing: bool,
                log_message: Callable[[str], None]) -> None:
     '''Prepare PE, perform checks, remote junk, write patched binary.'''
     beginning_file_size = len(pe.write())
-    # We are using the variable "end_of_real_data" and are reassigning 
-    # the value based on our analysis.We are assigning it now in case 
+    # We are using the variable "end_of_real_data" and are reassigning
+    # the value based on our analysis.We are assigning it now in case
     # we are unable to reduce the binary size for any reason.
     end_of_real_data = beginning_file_size
     pe_data = bytearray(pe.__data__)
     # Remove Signature and modify size of Optional Header Security entry.
     signature_address, signature_size = get_signature_info(pe)
     pe_data[signature_address:signature_address + signature_size] = []
-    signature_abnormality = handle_signature_abnormality(signature_address, 
-                                                        signature_size, 
+    signature_abnormality = handle_signature_abnormality(signature_address,
+                                                        signature_size,
                                                         beginning_file_size)
     if signature_abnormality:
         log_message('''
@@ -491,19 +491,19 @@ However, if the file does not run after this, it is in indicator that this metho
                     """)
                     last_section = find_last_section(pe)
                     end_of_real_data = last_section.PointerToRawData + last_section.SizeOfRawData
-                    pe_data = pe_data[:end_of_real_data] 
+                    pe_data = pe_data[:end_of_real_data]
                 else:
                     log_message("""
-Overlay was unable to be trimmed. Try unpacking with UniExtract2 or re-running 
+Overlay was unable to be trimmed. Try unpacking with UniExtract2 or re-running
 Debloat with the "--last-ditch" parameter."""
                                 )
     # Handle bloated sections
     # TODO: break up into functions
     else:
-        # In order to solve some use cases, we will find the biggest section 
+        # In order to solve some use cases, we will find the biggest section
         # within the binary.
         end_of_real_data, result = check_section_compression(pe, pe_data,
-                                                             end_of_real_data, 
+                                                             end_of_real_data,
                                                              log_message=log_message)
         log_message(result)
     # All processing is done. Report results.
