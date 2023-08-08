@@ -45,19 +45,19 @@ def write_multiple_files(out_path: str,
     '''
     Writes multiple files to disk when applicable.
     '''
-    log_message("Installer unpacked!")
-    log_message("The files are being written to a directory based on the path provided or your current working directory.")
+    log_message("Installer unpacked!\n")
+    log_message(f"The files are being written {out_path}")
     for file in files:
         out_file_path = Path(out_path) / Path(file.path.replace("\\", "/"))
         out_dir_path = out_file_path.parent
         out_dir_path.mkdir(parents=True, exist_ok=True)
         with open(out_file_path, "wb") as f:
             f.write(file.data)
-            log_message("File written: " + str(out_file_path))
-    
+            log_message("File written: " + str(Path(file.path.replace("\\", "/"))))
+    log_message("")
     log_message("The user will need to determine which file is malicious if any.")
     log_message("If a file is bloated: resubmit it through the tool to debloat it.")
-    log_message(f"Consider reviewing the setup file from the installer to determine how the files were meant to be used: {out_file_path} ")
+    log_message(f"Consider reviewing the 'setup.nsis' from the installer to determine how the files were meant to be used.")
 
     return
 
