@@ -3,7 +3,7 @@
 # Debloat
 Debloat is a GUI and CLI tool to remove excess garbage from bloated executables.
 
-By excess garbage, I mean 300 - 800MB of junk bytes added to a binary to keep it from going into a sandbox.
+By excess garbage, I mean 100 - 800 MB of junk bytes added to a binary to keep it from going into a sandbox.
 
 Being built with Python, the code and logic is easily accessible for others to take the concepts and apply them to their own tools. The program can be compiled for Windows, MacOS, Linux. The GUI removes any need for remembering commandline options and reading through CLI manuals: it is intended to be as simple as possible. The logic within the program handles the different use cases automatically.
 
@@ -19,9 +19,9 @@ When launched, you can drag and drop bloated file onto the text bar and press th
 Some technical information will be printed to the scrolling textbox and the file without bloat will be written to the directory the file was pulled from.
 Sound easy? It is!
 
-Running the program should debloat the binary in 30-40 second on average.
+Processing files will take a few seconds.
+![image](https://github.com/Squiblydoo/debloat/assets/77356206/1c56f677-e209-4a0f-8c35-c1905165a082)
 
-<img width="602" alt="Screenshot 2023-01-29 at 2 52 13 PM" src="https://user-images.githubusercontent.com/77356206/215352245-b37091ce-4d58-415c-a7ba-44a9c45bd6f1.png">
 
 ## How to use the CLI?
 After installing using `pip install debloat` use the command `debloat`.<br>
@@ -88,6 +88,9 @@ Windows<br>
 
 Linux<br> 
 `pyinstaller --onefile --noconsole --icon=debloat.ico --collect-all tkinterdnd2 gui.py`
+
+## Credits
+Big shoutout to Jesko Hüttenhain creator of [Binary Refinery](https://github.com/binref/refinery). The NSIS extraction is based on his reverse engineering of the NSIS file format. Check out Binary Refinery if you have not.
 
 ## Where is this project going next?
 Batch processing: process all files in a directory and produce a report.
