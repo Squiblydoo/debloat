@@ -19,7 +19,7 @@ When launched, you can drag and drop bloated file onto the text bar and press th
 Some technical information will be printed to the scrolling textbox and the file without bloat will be written to the directory the file was pulled from.
 Sound easy? It is!
 
-Processing files will take a few seconds.
+Processing files will take a few seconds.<br>
 ![image](https://github.com/Squiblydoo/debloat/assets/77356206/1c56f677-e209-4a0f-8c35-c1905165a082)
 
 
