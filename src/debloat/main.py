@@ -15,7 +15,7 @@ def main() -> int:
                         help="Output location", 
                         type=Path,
                         required=False)
-    parser.add_argument("-u", "--last-ditch", dest="last_ditch_processing",
+    parser.add_argument("-yolo", "--last-ditch", dest="last_ditch_processing",
                         help="""
     Run last-ditch processing. In this mode Debloat may remove the
     whole PE Overlay as a last resort if no smarter method works.
