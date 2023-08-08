@@ -1,3 +1,17 @@
+1.5.0
+- Added capability to handle Nullsoft Scriptable Install System (NSIS, aka Nullsoft) executables.
+	- Setup instructions and binaries are extracted from the Nullsoft installer to a separate directory.
+	- At this time, the user needs to resubmit files if they are bloated. Currently, debloat has no way of determining which files are malicious.
+
+- Fully renamed "Unsafe" Processing to "last_ditch_processing"
+	- Last ditch better represents its purpose.
+	- "Unsafe" is a name that is often used in the context of untrusted code.
+
+- Adjusted how debloat determines if junk was removed or not:
+	- Previously, it could think junk removed if 1 or more bytes were removed or if only the signature was removed.
+	- Now debloat checks for a 10% removal at the least
+
+
 1.4.3
 - Fixed a logic bug where debloating a section did not debloat the proper section.
     - This worked previously when the bloated section was the last section
@@ -26,10 +40,10 @@
 
 1.3.2
 - Added Dynamic Trim for trimming bytes from both the Overlay and bloated sections
---Dynamic trim identifies the junk and creates a targeted regex to remove it.
+	- Dynamic trim identifies the junk and creates a targeted regex to remove it.
 
 - Improved output. 
--- Output wasn't being updated as the program ran. I now clear the buffer and update the UI after each output message.
+	- Output wasn't being updated as the program ran. I now clear the buffer and update the UI after each output message.
 
 1.3.1
 - Fixed required versions in pyproject.toml

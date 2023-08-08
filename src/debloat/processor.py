@@ -90,12 +90,19 @@ def handle_signature_abnormality(signature_address: int,
         return True
     return False
 
-def check_for_packer(pe: pefile.PE) -> int:
+def check_and_extract_NSIS(possible_header: bytearray, data: bytearray) -> list:
+    '''Check if the PE is an NSIS installer.'''
+    extractor = nsisParser.extractNSIS()
+    guess = extractor._find_archive_offset(possible_header)
+    if guess is not None:
+        files = extractor.unpack(data)
+        return files
+
+def check_for_packer(possible_header: bytearray) -> int:
     '''Check overlay bytes for known packers.'''
-    packer_header = pe.write()[pe.get_overlay_data_start_offset():pe.get_overlay_data_start_offset() + 30]
     # TODO: Evalute any other packers that need special processing.
 
-    # TODO: Expand checks for NSIS to match the NSISParser
+    # NullSoft is not a packer, but an installer. We will detect this. It cannot be processed at this time
     NULLSOFT_MAGICS = [
         # https://nsis.sourceforge.io/Can_I_decompile_an_existing_installer
         B'\xEF\xBE\xAD\xDE' B'Null' B'soft' B'Inst',   # v1.6
@@ -105,7 +112,7 @@ def check_for_packer(pe: pefile.PE) -> int:
     ]
 
     for magic in range(len(NULLSOFT_MAGICS)):
-        packer_header_match = re.search(NULLSOFT_MAGICS[magic], packer_header)
+        packer_header_match = re.search(NULLSOFT_MAGICS[magic], possible_header)
         if packer_header_match:
              # Future: Handle NSIS installers
             return 1 # Nullsoft
@@ -470,7 +477,7 @@ def trim_junk(pe: pefile.PE, bloated_content: bytes,
 
     return delta_last_non_junk  
 
-def process_pe(pe: pefile.PE, out_path: str, unsafe_processing: bool,
+def process_pe(pe: pefile.PE, out_path: str, last_ditch_processing: bool,
                log_message: Callable[[str], None]) -> None:
     '''Prepare PE, perform checks, remote junk, write patched binary.'''
     beginning_file_size = len(pe.write())
@@ -492,24 +499,26 @@ We detected data after the signature. This is abnormal. Removing signature and e
         pe_data = pe_data[:end_of_real_data]
     # Handle Overlays: this includes packers and overlays which are completely junk
     elif pe.get_overlay_data_start_offset() and signature_size < len(pe.get_overlay()):
+        possible_header = pe.write()[pe.get_overlay_data_start_offset():pe.get_overlay_data_start_offset() + 30]
+        # Check first to see if the file is NSIS
+        nsis_extracted = check_and_extract_NSIS(possible_header, pe_data)
+        if nsis_extracted:
+            write_multiple_files(out_path, nsis_extracted, log_message)
+            return 0
         log_message("An overlay was detected. Checking for known packer.")
-        packer_idenfitied = check_for_packer(pe)
+        packer_idenfitied = check_for_packer(possible_header)
         if packer_idenfitied:
             log_message("Packer identified: " + PACKER[packer_idenfitied])
             if PACKER[1]:
-                log_message("Attempting to unpack Nullsoft Installer...")
-                extractor = nsisParser.extractNSIS()
-                files = extractor.unpack(pe_data)
-                write_multiple_files(out_path, files, log_message)
-                return 0
+                log_message("Nullsoft Installer, but unable to extract.")
         else:
             log_message("Packer not identified. Attempting dynamic trim...")
             last_section = find_last_section(pe)
             overlay = pe_data[last_section.PointerToRawData + last_section.SizeOfRawData:]
             end_of_real_data = trim_junk(pe, overlay, end_of_real_data)
             pe_data = pe_data[:end_of_real_data]
-            if end_of_real_data == beginning_file_size:
-                if unsafe_processing is True:
+            if end_of_real_data > (beginning_file_size * 0.9) or end_of_real_data == beginning_file_size :
+                if last_ditch_processing is True:
                     log_message("""
 "Last ditch" switch detected. Running last ditch debloat technique:\n
 This is the last resort that removes the whole overlay: this works in cases where the overlay lacks a pattern.
@@ -533,7 +542,7 @@ Debloat with the "--last-ditch" parameter."""
                                                              log_message=log_message)
         log_message(result)
     # All processing is done. Report results.
-    if end_of_real_data == beginning_file_size:
+    if end_of_real_data > (beginning_file_size * 0.9) or end_of_real_data == beginning_file_size:
         log_message("""No automated method for reducing the size worked. Please consider sharing the
 sample for additional analysis.
 Email: Squiblydoo@pm.me

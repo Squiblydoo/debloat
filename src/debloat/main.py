@@ -15,7 +15,7 @@ def main() -> int:
                         help="Output location", 
                         type=Path,
                         required=False)
-    parser.add_argument("-u", "--last-ditch-effort", dest="unsafe",
+    parser.add_argument("-u", "--last-ditch-effort", dest="last_ditch_processing",
                         help="""
     Run last-ditch-effort processing. In this mode Debloat may remove the
     whole PE Overlay as a last resort if no smarter method works.
@@ -42,7 +42,7 @@ Maybe it needs unzipped?'''
         return 1
 
     debloat.processor.process_pe(pe, 
-                        out_path=str(out_path), unsafe_processing=args.unsafe,
+                        out_path=str(out_path), last_ditch_processing=args.last_ditch_processing,
                         log_message=print
                         )
     return 0

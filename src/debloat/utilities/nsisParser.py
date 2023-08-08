@@ -1237,7 +1237,7 @@ class extractNSIS(ArchiveUnit):
             offset = self._find_archive_offset(data, before)
             if offset is None:
                 _error = _error or ValueError("Unable to find NSIS archive marker")
-                return _error
+                raise _error
             try:
                 archive = NSArchive(memory[offset:])
             except Exception as e:
