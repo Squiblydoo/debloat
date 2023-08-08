@@ -6,11 +6,14 @@
 - Fully renamed "Unsafe" Processing to "last_ditch_processing"
 	- Last ditch better represents its purpose.
 	- "Unsafe" is a name that is often used in the context of untrusted code.
+	- Fixed inconsistency in naming of "last ditch processing"
 
 - Adjusted how debloat determines if junk was removed or not:
 	- Previously, it could think junk removed if 1 or more bytes were removed or if only the signature was removed.
 	- Now debloat checks for a 10% removal at the least
 
+- Updated documentation regarding Linux build command.
+	- This had been updated elsewhere, but the update had not made it to the README
 
 1.4.3
 - Fixed a logic bug where debloating a section did not debloat the proper section.

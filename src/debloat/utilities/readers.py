@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# Most of this code was repurposed from Binary Refinery (https://github.com/binref/refinery), used under the 3-Clause BSD License
+
 from __future__ import annotations
 import io
 import itertools

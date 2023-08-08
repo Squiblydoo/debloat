@@ -33,7 +33,7 @@ The gui can also be launched from the CLI using the command `debloat-gui`.
 Not yet.
 My unscientific guess is that it should work for every 7 of 8 binaries. There are specific usecases I know where it does not work and I am working to implement solutions for those usecases. 
 
-In previous versions, `debloat` could accidentally remove too much of the binary. That is no longer the case unless you use the "--last-ditch-effort" switch. If you ever need this switch, consider sharing the sample for additional analysis. This option has now been added to the GUI. Functionally, what the function does is it will remove the whole overlay, if there is one. In some cases this is necessary as no pattern for the junk was found---this is most commonly the case in samples that do not compress well.
+In previous versions, `debloat` could accidentally remove too much of the binary. That is no longer the case unless you use the "--last-ditch" switch. If you ever need this switch, consider sharing the sample for additional analysis. This option has now been added to the GUI. Functionally, what the function does is it will remove the whole overlay, if there is one. In some cases this is necessary as no pattern for the junk was found---this is most commonly the case in samples that do not compress well.
 
 ## Use Cases (Images from [Malcat](https://malcat.fr/))
 ### Full support
@@ -53,9 +53,12 @@ In the image below, the bloat is identified as in the .rsrc section and is remov
 In the image below, the bloat has been included in a PE section named [0]. <br>
 ![Screenshot 2023-02-11 at 3 26 52 PM](https://user-images.githubusercontent.com/77356206/218279753-ed2c9102-482a-4639-aeb1-df8efc9c4e2e.png)
 
+- [X] Cases where the executable is a Nullsoft Scriptable Installer System executable (NSIS aka Nullsoft)
+These exe are installers that may contain one or more files. The files contained may or may not be malicious. (Sometimes actors will add files simply for increasing the file size.) All files within the installer are extracted to a new directory. The directory also contains the script for the installer which can be consulted to determine which files may be malicious.
+
 # Partial Support
 
-- [X] Some packer detection for instances where the binary simply cannot be debloated. For example, NullSoft installers. These can be unpacked with UniExtract2 and do not need debloated.
+- [X] Cases where the junk is too random and the entropy is too high. In these cases, a switch/option called "--last-ditch" 
 
 ### Other use cases
 There are use cases where the tool does not work. However, I plan to solve for them before publishing too much about them.
@@ -82,8 +85,7 @@ Windows<br>
 `pyinstaller --onefile  --noconsole  --additional-hooks-dir=./hook --icon=debloat.ico gui.py`
 
 Linux<br> 
-`~/.local/bin/pyinstaller --onefile --noconsole --icon=debloat.ico --additional-hooks-dir=./hook --add-binary "/home/redacted/.local/lib/python3.10/site-packages/:." gui.py`
-- I'm not sure why the same hook didn't work on Linux and pointing to the site-packages directory is not preferred. For some unknown reason, it would not find the binary if I pointed to the specific tkinterdnd2 or tkdnd directories.
+`pyinstaller --onefile --noconsole --icon=debloat.ico --collect-all tkinterdnd2 gui.py`
 
 ## Where is this project going next?
 Batch processing: process all files in a directory and produce a report.
