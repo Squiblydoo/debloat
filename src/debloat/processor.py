@@ -10,6 +10,7 @@ adjust_offsets()
 refinery_trim_resources()
 The RSRC Class is also from refinery.
 """
+from pathlib import Path
 import re
 from typing import Tuple, Optional, Any, Callable
 import pefile
@@ -18,6 +19,7 @@ import zlib
 from pefile import Structure, SectionStructure, DIRECTORY_ENTRY
 from typing import Generator, Iterable, Optional
 
+import debloat.utilities.nsisParser as nsisParser
 import debloat.utilities.rsrc as rsrc
 
 _KB = 1000
@@ -37,6 +39,28 @@ def readable_size(value: int) -> str:
         return '%.1f MB' % (float(value) / 1024.0 / 1024.0)
     else:
         return '%.1f GB' % (float(value) / 1024.0 / 1024.0 / 1024.0)
+
+def write_multiple_files(out_path: str,
+                         files: list, log_message: Callable[[str], None]) -> Tuple[int, str]:
+    '''
+    Writes multiple files to disk when applicable.
+    '''
+    log_message("Installer unpacked!")
+    log_message("The files are being written to a directory based on the path provided or your current working directory.")
+    for file in files:
+        out_file_path = Path(out_path) / Path(file.path.replace("\\", "/"))
+        out_dir_path = out_file_path.parent
+        out_dir_path.mkdir(parents=True, exist_ok=True)
+        with open(out_file_path, "wb") as f:
+            f.write(file.data)
+            log_message("File written: " + str(out_file_path))
+    
+    log_message("The user will need to determine which file is malicious if any.")
+    log_message("If a file is bloated: resubmit it through the tool to debloat it.")
+    log_message(f"Consider reviewing the setup file from the installer to determine how the files were meant to be used: {out_file_path} ")
+
+    return
+
 
 def write_patched_file(out_path: str,
                         pe: pefile.PE) -> Tuple[int, str]:
@@ -71,7 +95,7 @@ def check_for_packer(pe: pefile.PE) -> int:
     packer_header = pe.write()[pe.get_overlay_data_start_offset():pe.get_overlay_data_start_offset() + 30]
     # TODO: Evalute any other packers that need special processing.
 
-    # NullSoft is not a packer, but an installer. We will detect this. It cannot be processed at this time
+    # TODO: Expand checks for NSIS to match the NSISParser
     NULLSOFT_MAGICS = [
         # https://nsis.sourceforge.io/Can_I_decompile_an_existing_installer
         B'\xEF\xBE\xAD\xDE' B'Null' B'soft' B'Inst',   # v1.6
@@ -473,9 +497,11 @@ We detected data after the signature. This is abnormal. Removing signature and e
         if packer_idenfitied:
             log_message("Packer identified: " + PACKER[packer_idenfitied])
             if PACKER[1]:
-                log_message('''
-The original file cannot be debloated. It must be unpacked with a tool such as UniExtract2.
-                ''')
+                log_message("Attempting to unpack Nullsoft Installer...")
+                extractor = nsisParser.extractNSIS()
+                files = extractor.unpack(pe_data)
+                write_multiple_files(out_path, files, log_message)
+                return 0
         else:
             log_message("Packer not identified. Attempting dynamic trim...")
             last_section = find_last_section(pe)
