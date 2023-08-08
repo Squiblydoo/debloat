@@ -55,6 +55,8 @@ In the image below, the bloat has been included in a PE section named [0]. <br>
 
 - [X] Cases where the executable is a Nullsoft Scriptable Installer System executable (NSIS aka Nullsoft)
 These exe are installers that may contain one or more files. The files contained may or may not be malicious. (Sometimes actors will add files simply for increasing the file size.) All files within the installer are extracted to a new directory. The directory also contains the script for the installer which can be consulted to determine which files may be malicious.
+In the image below, Malcat has identified the executable as a NSIS installer.
+![image](https://github.com/Squiblydoo/debloat/assets/77356206/86780abc-da4b-4808-bccb-733d97fa80d8)
 
 # Partial Support
 
