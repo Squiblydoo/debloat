@@ -87,7 +87,7 @@ with an executable. Maybe it needs unzipped?''')
 
         debloat.processor.process_pe(pe,  out_path, self.unsafe_processing.get(), 
                    log_message=self.output_scrollbox_handler)
-        self.output_scrollbox_handler("-----Processessing took %s seconds ---\n" \
+        self.output_scrollbox_handler("-----Processing took %s seconds ---\n" \
                                     % round((time.time() - start_time), 2))
         self.clear_pathbox()
 
