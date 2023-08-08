@@ -1,4 +1,4 @@
-
+![debloat](https://user-images.githubusercontent.com/77356206/215351855-9f89c298-36b4-4234-89b5-dc3f26d1f8b0.png)
 
 # Debloat
 Debloat is a GUI and CLI tool to remove excess garbage from bloated executables.
@@ -20,7 +20,7 @@ Some technical information will be printed to the scrolling textbox and the file
 Sound easy? It is!
 
 Processing files will take a few seconds.<br>
-![image](https://github.com/Squiblydoo/debloat/assets/77356206/3d2756cd-bc83-44e8-b223-edd8ed464369)![debloat](https://user-images.githubusercontent.com/77356206/215351855-9f89c298-36b4-4234-89b5-dc3f26d1f8b0.png)
+![image](https://github.com/Squiblydoo/debloat/assets/77356206/3d2756cd-bc83-44e8-b223-edd8ed464369)
 
 
 ## How to use the CLI?
