@@ -3,7 +3,7 @@
 # Debloat
 Debloat is a GUI and CLI tool to remove excess garbage from bloated executables.
 
-By excess garbage, I mean 300 - 800MB of junk bytes added to a binary to keep it from going into a sandbox.
+By excess garbage, I mean 100 - 800 MB of junk bytes added to a binary to keep it from going into a sandbox.
 
 Being built with Python, the code and logic is easily accessible for others to take the concepts and apply them to their own tools. The program can be compiled for Windows, MacOS, Linux. The GUI removes any need for remembering commandline options and reading through CLI manuals: it is intended to be as simple as possible. The logic within the program handles the different use cases automatically.
 
@@ -19,9 +19,9 @@ When launched, you can drag and drop bloated file onto the text bar and press th
 Some technical information will be printed to the scrolling textbox and the file without bloat will be written to the directory the file was pulled from.
 Sound easy? It is!
 
-Running the program should debloat the binary in 30-40 second on average.
+Processing files will take a few seconds.<br>
+![image](https://github.com/Squiblydoo/debloat/assets/77356206/3d2756cd-bc83-44e8-b223-edd8ed464369)
 
-<img width="602" alt="Screenshot 2023-01-29 at 2 52 13 PM" src="https://user-images.githubusercontent.com/77356206/215352245-b37091ce-4d58-415c-a7ba-44a9c45bd6f1.png">
 
 ## How to use the CLI?
 After installing using `pip install debloat` use the command `debloat`.<br>
@@ -33,7 +33,7 @@ The gui can also be launched from the CLI using the command `debloat-gui`.
 Not yet.
 My unscientific guess is that it should work for every 7 of 8 binaries. There are specific usecases I know where it does not work and I am working to implement solutions for those usecases. 
 
-In previous versions, `debloat` could accidentally remove too much of the binary. That is no longer the case unless you use the "--last-ditch-effort" switch. If you ever need this switch, consider sharing the sample for additional analysis. This option has now been added to the GUI. Functionally, what the function does is it will remove the whole overlay, if there is one. In some cases this is necessary as no pattern for the junk was found---this is most commonly the case in samples that do not compress well.
+In previous versions, `debloat` could accidentally remove too much of the binary. That is no longer the case unless you use the "--last-ditch" switch. If you ever need this switch, consider sharing the sample for additional analysis. This option has now been added to the GUI. Functionally, what the function does is it will remove the whole overlay, if there is one. In some cases this is necessary as no pattern for the junk was found---this is most commonly the case in samples that do not compress well.
 
 ## Use Cases (Images from [Malcat](https://malcat.fr/))
 ### Full support
@@ -53,9 +53,14 @@ In the image below, the bloat is identified as in the .rsrc section and is remov
 In the image below, the bloat has been included in a PE section named [0]. <br>
 ![Screenshot 2023-02-11 at 3 26 52 PM](https://user-images.githubusercontent.com/77356206/218279753-ed2c9102-482a-4639-aeb1-df8efc9c4e2e.png)
 
+- [X] Cases where the executable is a Nullsoft Scriptable Installer System executable (NSIS aka Nullsoft)
+These exe are installers that may contain one or more files. The files contained may or may not be malicious. (Sometimes actors will add files simply for increasing the file size.) All files within the installer are extracted to a new directory. The directory also contains the script for the installer which can be consulted to determine which files may be malicious.
+In the image below, Malcat has identified the executable as a NSIS installer.
+![image](https://github.com/Squiblydoo/debloat/assets/77356206/86780abc-da4b-4808-bccb-733d97fa80d8)
+
 # Partial Support
 
-- [X] Some packer detection for instances where the binary simply cannot be debloated. For example, NullSoft installers. These can be unpacked with UniExtract2 and do not need debloated.
+- [X] Cases where the junk is too random and the entropy is too high. In these cases, a switch/option called "--last-ditch" 
 
 ### Other use cases
 There are use cases where the tool does not work. However, I plan to solve for them before publishing too much about them.
@@ -82,8 +87,10 @@ Windows<br>
 `pyinstaller --onefile  --noconsole  --additional-hooks-dir=./hook --icon=debloat.ico gui.py`
 
 Linux<br> 
-`~/.local/bin/pyinstaller --onefile --noconsole --icon=debloat.ico --additional-hooks-dir=./hook --add-binary "/home/redacted/.local/lib/python3.10/site-packages/:." gui.py`
-- I'm not sure why the same hook didn't work on Linux and pointing to the site-packages directory is not preferred. For some unknown reason, it would not find the binary if I pointed to the specific tkinterdnd2 or tkdnd directories.
+`pyinstaller --onefile --noconsole --icon=debloat.ico --collect-all tkinterdnd2 gui.py`
+
+## Credits
+Big shoutout to Jesko Hüttenhain creator of [Binary Refinery](https://github.com/binref/refinery). The NSIS extraction is based on his reverse engineering of the NSIS file format. Check out Binary Refinery if you have not.
 
 ## Where is this project going next?
 Batch processing: process all files in a directory and produce a report.
