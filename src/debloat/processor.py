@@ -93,7 +93,7 @@ def handle_signature_abnormality(signature_address: int,
 def check_and_extract_NSIS(possible_header: bytearray, pe: pefile.PE) -> list:
     '''Check if the PE is an NSIS installer.'''
     extractor = nsisParser.extractNSIS()
-    guess = extractor._find_archive_offset(possible_header)
+    guess = extractor._find_archive_offset(memoryview(possible_header))
     if guess is not None:
         files = extractor.unpack(memoryview(pe.__data__))
         return files
@@ -405,7 +405,7 @@ def find_chunk_start(targeted_regex, chunk_start, original_size_with_junk, bloat
         targeted_regex_match = compiled_targeted_regex.search(binascii.hexlify(bloated_content[chunk_start:chunk_end]))
         if targeted_regex_match:
             chunk_start += targeted_regex_match.end(0)
-            unmatched_portion = step - int(targeted_regex_match.end(0))
+            unmatched_portion = step - targeted_regex_match.end(0)
         else:
             # If the targeted_regex_match does not
             # return anything, that indicates the previous loop
