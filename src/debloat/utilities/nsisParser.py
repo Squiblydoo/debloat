@@ -1191,7 +1191,7 @@ class extractNSIS(ArchiveUnit):
     A class to extract an NSIS file.
     """
     @classmethod
-    def _find_archive_offset(cls, data: bytearray, before: int = -1, flaw_max=2) -> int:
+    def _find_archive_offset(cls, data: memoryview, before: int = -1, flaw_max=2) -> int:
         def signatures(*magics):
             for changes in range(flaw_max + 1):
                 for magic in magics:
@@ -1204,7 +1204,7 @@ class extractNSIS(ArchiveUnit):
                             signature[position] = 0x2E
                         yield changes, bytes(signature)
         best_guess = None
-        search_space = memoryview(data)
+        search_space = data
         for flaws, sig in signatures(*NSArchive.MAGICS):
             if flaws > 1:
                 search_space = search_space[:0x20_000]
@@ -1233,8 +1233,7 @@ class extractNSIS(ArchiveUnit):
             logging.debug(message)
         return best_guess
 
-    def unpack(self, data):
-        memory = memoryview(data)
+    def unpack(self, data: memoryview):
         before = -1
         _error = None
         while True:
@@ -1243,7 +1242,7 @@ class extractNSIS(ArchiveUnit):
                 _error = _error or ValueError("Unable to find NSIS archive marker")
                 raise _error
             try:
-                archive = NSArchive(memory[offset:])
+                archive = NSArchive(data[offset:])
             except Exception as e:
                 _error = e
                 before = offset
