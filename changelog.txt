@@ -1,3 +1,13 @@
+1.5.1
+- Made modifications recommended by gdesmar for memory improvements.
+	- Added the ability to pass the size of the file to the process_pe method
+		- This reduces memory usage to calculate the length
+	- Bug fixes suggested by gdesmar such as passing the correct object type
+	- New compression algorithim implemented
+	- See https://github.com/Squiblydoo/debloat/pull/18 to learn more about performance enhancements.
+- Implemented the optional "beginning_file_size" parameter for "process_pe" in both main.py and gui.py
+- Fixed typecasting bug introduced in 1.5.0 in relation to the "write_multiple_files" method
+
 1.5.0
 - Added capability to handle Nullsoft Scriptable Install System (NSIS, aka Nullsoft) executables.
 	- Setup instructions and binaries are extracted from the Nullsoft installer to a separate directory.

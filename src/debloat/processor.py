@@ -41,7 +41,7 @@ def readable_size(value: int) -> str:
         return '%.1f GB' % (float(value) / 1024.0 / 1024.0 / 1024.0)
 
 def write_multiple_files(out_path: str,
-                         files: list, log_message: Callable[[str], None]) -> Tuple[int, str]:
+                         files: list, log_message: Callable[[str], None]) -> None:
     '''
     Writes multiple files to disk when applicable.
     '''

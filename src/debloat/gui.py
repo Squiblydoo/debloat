@@ -1,5 +1,5 @@
 """This file handles all GUI components."""
-
+import os
 import time
 from pathlib import Path 
 from tkinter import *
@@ -82,11 +82,14 @@ Provided file is not an executable! Please try again
 with an executable. Maybe it needs unzipped?''')
             self.clear_pathbox()
             return
+        file_size = os.path.getsize(file_path)
         out_path = file_path.parent \
             / f"{file_path.stem}_patched{file_path.suffix}"
 
-        debloat.processor.process_pe(pe,  out_path, self.unsafe_processing.get(), 
-                   log_message=self.output_scrollbox_handler)
+        debloat.processor.process_pe(pe,  out_path, 
+                                     self.unsafe_processing.get(), 
+                   log_message=self.output_scrollbox_handler,
+                   beginning_file_size=file_size)
         self.output_scrollbox_handler("-----Processing took %s seconds ---\n" \
                                     % round((time.time() - start_time), 2))
         self.clear_pathbox()

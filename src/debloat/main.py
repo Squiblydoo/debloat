@@ -1,5 +1,5 @@
 """This file handles passing the CLI arguments into the processor"""
-
+import os
 import sys
 from pathlib import Path
 import argparse
@@ -25,6 +25,7 @@ def main() -> int:
 
     file_path = args.executable
     out_path = args.output
+    file_size = os.path.getsize(file_path)
 
     if not out_path:
         out_path = file_path.parent \
@@ -42,8 +43,10 @@ Maybe it needs unzipped?'''
         return 1
 
     debloat.processor.process_pe(pe, 
-                        out_path=str(out_path), last_ditch_processing=args.last_ditch_processing,
-                        log_message=print
+                        out_path=str(out_path), 
+                        last_ditch_processing=args.last_ditch_processing,
+                        log_message=print,
+                        beginning_file_size=file_size
                         )
     return 0
 
