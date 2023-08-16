@@ -385,7 +385,7 @@ The compression ratio of ''' + biggest_section.Name.decode() + ''' is indicative
             # Get the size of the section.
             biggest_section_end = biggest_section.PointerToRawData + biggest_section.SizeOfRawData
             original_section_size = biggest_section.SizeOfRawData
-            biggest_section_data = pe.__data__[biggest_section.PointerToRawData:biggest_section_end]
+            biggest_section_data = memoryview(pe.__data__)[biggest_section.PointerToRawData:biggest_section_end]
 
             delta_last_non_junk = trim_junk(pe, biggest_section_data, original_section_size)
             # Remove the junk from the section.
@@ -396,13 +396,14 @@ The compression ratio of ''' + biggest_section.Name.decode() + ''' is indicative
             log_message("Bloated section reduced.")
             return result
 
-def find_chunk_start(targeted_regex, chunk_start, original_size_with_junk, bloated_content: bytes, step):
+def find_chunk_start(targeted_regex, chunk_start, original_size_with_junk, bloated_content: memoryview, step):
+    bloated_content_len = len(bloated_content)
     unmatched_portion = 0
     compiled_targeted_regex = re.compile(targeted_regex)
     chunk_end = chunk_start
     while original_size_with_junk > chunk_end:
         chunk_end = chunk_start + step
-        targeted_regex_match = compiled_targeted_regex.search(binascii.hexlify(bloated_content[chunk_start:chunk_end]))
+        targeted_regex_match = compiled_targeted_regex.search(binascii.hexlify(bytes(bloated_content[max(bloated_content_len - chunk_end, 0):bloated_content_len - chunk_start])[::-1]))
         if targeted_regex_match:
             chunk_start += targeted_regex_match.end(0)
             unmatched_portion = step - targeted_regex_match.end(0)
@@ -411,24 +412,22 @@ def find_chunk_start(targeted_regex, chunk_start, original_size_with_junk, bloat
             # return anything, that indicates the previous loop
             # had content which did not match. We'll use that
             # to help ensure we do not remove too much of the file.
-
             chunk_start += unmatched_portion
             break
     return chunk_start
 
-def trim_junk(pe: pefile.PE, bloated_content: bytes,
+def trim_junk(pe: pefile.PE, bloated_content: memoryview,
               original_size_with_junk: int) -> int:
     '''Attempts multiple methods to trim junk from the end of a section.'''
     alignment = pe.OPTIONAL_HEADER.FileAlignment
 
-    backward_bloated_content = bloated_content[::-1]
     # Regex Explained:
     # Match raw bytes that are repeated more than 20 times at the end
     # of a binary.
     delta_last_non_junk = original_size_with_junk
     # First Method: Trims 1 repeating byte.
     # Check against 200 bytes, if successful, calculate full match.
-    junk_match = re.search(rb'^(..)\1{20,}', backward_bloated_content[:600])
+    junk_match = re.search(rb'^(..)\1{20,}', bytes(bloated_content[:-601:-1]))
     # Second Method: If "not junk_match" check for junk larger than 1 repeating byte
     chunk_start = 0
     if not junk_match:
@@ -440,12 +439,12 @@ def trim_junk(pe: pefile.PE, bloated_content: bytes,
             # This indicates junk bytes in the overlay. Match that set
             # of repeated bytes 1 or more times.
             junk_regex = rb"^(..{" + bytes(str(i), "utf-8") + rb"})\1{2,}"
-            multibyte_junk_regex = re.search(junk_regex, backward_bloated_content[:1000])
+            multibyte_junk_regex = re.search(junk_regex, bytes(bloated_content[:-1001:-1]))
             if multibyte_junk_regex:
                 # Having found the pattern, we can make the regex efficient
                 # by targeting the pattern using the "targeted_regex"
                 targeted_regex = rb"(" + binascii.hexlify(multibyte_junk_regex.group(1)) + rb")\1{1,}"
-                chunk_start = find_chunk_start(targeted_regex, chunk_start, original_size_with_junk, backward_bloated_content, 1000)
+                chunk_start = find_chunk_start(targeted_regex, chunk_start, original_size_with_junk, bloated_content, 1000)
                 break
                 # It was determined that data cannot be removed any more
                 # from the chunk_start. But the value of chunk_start
@@ -454,9 +453,23 @@ def trim_junk(pe: pefile.PE, bloated_content: bytes,
     # Third Method: check for a series of one repeated byte.
     # Junk was identified. A new size is assigned and returned.
     else:
-        targeted_regex = rb""+ binascii.hexlify(junk_match.string) + rb"{1,}"
-        targeted_junk_match = re.search(targeted_regex, binascii.hexlify(backward_bloated_content))
-        junk_to_remove = targeted_junk_match.end(0)
+        bloated_content_len = len(bloated_content)
+        targeted_regex = rb"("+ binascii.hexlify(junk_match.group(1)) + rb")\1{1,}"
+        precompiled_chunk = binascii.hexlify(junk_match.group(1)) * int(1000/len(junk_match.group(1)))
+        compiled_targeted_regex = re.compile(targeted_regex)
+        chunk_end = chunk_start
+        while original_size_with_junk > chunk_end:
+            chunk_end = chunk_start + 1000
+            chunk = binascii.hexlify(bytes(bloated_content[max(bloated_content_len - chunk_end, 0):bloated_content_len - chunk_start])[::-1])
+            if chunk == precompiled_chunk:
+                chunk_start += 1000
+                continue
+            targeted_regex_match = compiled_targeted_regex.search(chunk)
+            if targeted_regex_match:
+                chunk_start += int(targeted_regex_match.end(0)/2)
+            else:
+                break
+        junk_to_remove = chunk_start * 2
         # If the trimming did not remove more than half of the bytes then
         # this suggests the attacker may have put a random series of
         # repeated bytes. These will be removed by loading the overlay
@@ -465,7 +478,7 @@ def trim_junk(pe: pefile.PE, bloated_content: bytes,
         if junk_to_remove < original_size_with_junk / 2:
             chunk_start = junk_to_remove
             targeted_regex = rb'(..)\1{20,}'
-            junk_to_remove = find_chunk_start(targeted_regex, chunk_start, original_size_with_junk, backward_bloated_content, 200)
+            junk_to_remove = find_chunk_start(targeted_regex, chunk_start, original_size_with_junk, bloated_content, 200)
         else:
             junk_to_remove = int(junk_to_remove / 2)
         delta_last_non_junk -= junk_to_remove
@@ -509,7 +522,7 @@ We detected data after the signature. This is abnormal. Removing signature and e
         else:
             log_message("Packer not identified. Attempting dynamic trim...")
             last_section = find_last_section(pe)
-            overlay = pe.__data__[last_section.PointerToRawData + last_section.SizeOfRawData:signature_address or beginning_file_size]
+            overlay = memoryview(pe.__data__)[last_section.PointerToRawData + last_section.SizeOfRawData:signature_address or beginning_file_size]
             end_of_real_data = trim_junk(pe, overlay, beginning_file_size)
             if end_of_real_data > beginning_file_size * 0.9:
                 if last_ditch_processing is True:
