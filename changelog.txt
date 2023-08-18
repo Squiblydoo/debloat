@@ -1,3 +1,9 @@
+1.5.2
+- Merged Optimization changes
+	- Changes primarily related to the trim_junk function
+	- Primary changes reduced the active memory cost
+- No changes in the functionality were made in this release.
+
 1.5.1
 - Made modifications recommended by gdesmar for memory improvements.
 	- Added the ability to pass the size of the file to the process_pe method
