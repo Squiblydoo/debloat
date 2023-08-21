@@ -398,7 +398,6 @@ The compression ratio of ''' + biggest_section.Name.decode() + ''' is indicative
 
 def find_chunk_start(targeted_regex, chunk_start, original_size_with_junk, bloated_content: memoryview, step):
     bloated_content_len = len(bloated_content)
-    unmatched_portion = 0
     compiled_targeted_regex = re.compile(targeted_regex)
     chunk_end = chunk_start
     while original_size_with_junk > chunk_end:
@@ -406,13 +405,12 @@ def find_chunk_start(targeted_regex, chunk_start, original_size_with_junk, bloat
         targeted_regex_match = compiled_targeted_regex.search(binascii.hexlify(bytes(bloated_content[max(bloated_content_len - chunk_end, 0):bloated_content_len - chunk_start])[::-1]))
         if targeted_regex_match:
             chunk_start += targeted_regex_match.end(0)
-            unmatched_portion = step - targeted_regex_match.end(0)
         else:
             # If the targeted_regex_match does not
             # return anything, that indicates the previous loop
             # had content which did not match. We'll use that
             # to help ensure we do not remove too much of the file.
-            chunk_start += unmatched_portion
+            chunk_start -= step * 2
             break
     return chunk_start
 
@@ -428,9 +426,9 @@ def trim_junk(pe: pefile.PE, bloated_content: memoryview,
     # First Method: Trims 1 repeating byte.
     # Check against 200 bytes, if successful, calculate full match.
     junk_match = re.search(rb'^(..)\1{20,}', bytes(bloated_content[:-601:-1]))
-    # Second Method: If "not junk_match" check for junk larger than 1 repeating byte
     chunk_start = 0
     if not junk_match:
+        # Second Method: If "not junk_match" check for junk larger than 1 repeating byte
         # Brute force check: check to see if there are 1-20 bytes
         # being repeated and feed the number into the regex
         for i in range(300):
@@ -450,13 +448,12 @@ def trim_junk(pe: pefile.PE, bloated_content: memoryview,
                 # from the chunk_start. But the value of chunk_start
                 # now tells us how much data we can safely remove.
         delta_last_non_junk -= chunk_start
-    # Third Method: check for a series of one repeated byte.
     # Junk was identified. A new size is assigned and returned.
     else:
         bloated_content_len = len(bloated_content)
         targeted_regex = rb"("+ binascii.hexlify(junk_match.group(1)) + rb")\1{1,}"
         precompiled_chunk = binascii.hexlify(junk_match.group(1)) * int(1000/len(junk_match.group(1)))
-        compiled_targeted_regex = re.compile(targeted_regex)
+        #compiled_targeted_regex = re.compile(targeted_regex)
         chunk_end = chunk_start
         while original_size_with_junk > chunk_end:
             chunk_end = chunk_start + 1000
@@ -464,29 +461,30 @@ def trim_junk(pe: pefile.PE, bloated_content: memoryview,
             if chunk == precompiled_chunk:
                 chunk_start += 1000
                 continue
-            targeted_regex_match = compiled_targeted_regex.search(chunk)
-            if targeted_regex_match:
-                chunk_start += int(targeted_regex_match.end(0)/2)
             else:
+                # If the chunk does not match the precompiled chunk,
+                # we will return to the previous chunk_start in order
+                # to ensure important bytes are not removed.
+                if chunk_start > 1000:
+                    chunk_start -= 1000
                 break
-        junk_to_remove = chunk_start * 2
+        junk_to_remove = chunk_start 
+        # Third Method: check for a series of one repeated byte.
         # If the trimming did not remove more than half of the bytes then
         # this suggests the attacker may have put a random series of
         # repeated bytes. These will be removed by loading the overlay
         # 200 bytes at a time and removing parts which repeat for more
         # than 20 bytes.
-        if junk_to_remove < original_size_with_junk / 2:
+        if junk_to_remove * 2 < original_size_with_junk / 2:
             chunk_start = junk_to_remove
             targeted_regex = rb'(..)\1{20,}'
             junk_to_remove = find_chunk_start(targeted_regex, chunk_start, original_size_with_junk, bloated_content, 200)
-        else:
-            junk_to_remove = int(junk_to_remove / 2)
         delta_last_non_junk -= junk_to_remove
 
     # The returned size must account for the file alignment.
     # We will make sure it is aligned by adding bytes.
-    not_aligned = delta_last_non_junk % alignment
-    delta_last_non_junk = delta_last_non_junk - not_aligned
+    not_aligned = alignment - (delta_last_non_junk % alignment)
+    delta_last_non_junk = delta_last_non_junk + not_aligned
 
     return delta_last_non_junk
 
