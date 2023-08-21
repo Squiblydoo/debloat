@@ -1,3 +1,12 @@
+1.5.3
+- Fixed alignment bug
+	- There was a bug where I was subtracting instead of adding bytes to fix alignment. It now adds instead of subtracts.
+- Polished the trim
+	- The "find_chunk_start" method had some unclear logic, that has been improved. 
+	- Instead of trying to remove all junk, the method now returns all bytes if the full regex was unable to match.
+	- So, if the step is 1000 or 2000 bytes and not all of them are junk, it will leave all 1000
+		- The logic is that they aren't really hurting anything by being here, and it is better to leave them than accidentally remove them.
+
 1.5.2
 - Merged Optimization changes
 	- Changes primarily related to the trim_junk function
