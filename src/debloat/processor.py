@@ -234,7 +234,7 @@ def adjust_offsets(pe: pefile.PE, gap_offset: int, gap_size: int):
 
 
 def refinery_strip(pe: pefile.PE, data: memoryview, block_size=_MB) -> int:
-    threshold = 1
+    threshold = 0.05
     alignment = pe.OPTIONAL_HEADER.FileAlignment
     data_overhang = len(data) % alignment
     result = data_overhang
@@ -243,12 +243,15 @@ def refinery_strip(pe: pefile.PE, data: memoryview, block_size=_MB) -> int:
         return 0
 
     if 0 < threshold < 1:
+        def compression_ratio(offset: int):
+            ratio = len(zlib.compress(data[:offset], level=1)) / offset
+            return ratio
         upper = len(data)
         lower = result
-        if get_compressed_size(data, upper, level=1) <= threshold:
+        if compression_ratio(upper) <= threshold:
             while block_size < upper - lower:
                 pivot = (lower + upper) // 2
-                ratio = get_compressed_size(data, pivot, level=1)
+                ratio = compression_ratio(pivot)
                 if ratio > threshold:
                     lower = pivot + 1
                     continue
@@ -275,7 +278,7 @@ def refinery_strip(pe: pefile.PE, data: memoryview, block_size=_MB) -> int:
 
 
 def refinery_trim_resources(pe: pefile.PE, data_to_delete: List) -> int:
-    size_limit = 50000
+    size_limit = 10000
     size_removed = 0
 
     def find_bloated_resources(pe: pefile.PE, directory, level: int = 0, *path) -> Generator[Structure, None, None]:
