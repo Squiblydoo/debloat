@@ -4,9 +4,12 @@
 
 from collections import namedtuple
 import struct
-from debloat.utilities.readers import *
+
 import enum
 
+import itertools
+import re
+import io
 import dataclasses
 
 import zlib
@@ -16,7 +19,8 @@ import bz2
 from datetime import datetime
 
 import logging
-from typing import BinaryIO, NamedTuple, Iterable, Iterator, Callable
+from typing import BinaryIO, NamedTuple, Iterable, Iterator, Callable, Union, ByteString, Optional, List, Dict
+from debloat.utilities.readers import StructReader, Struct, StreamDetour, MemoryFile
 
 logging.basicConfig(level=logging.WARN)
 
@@ -1098,7 +1102,7 @@ class NSArchive(Struct):
                     data = self.entries[item.offset]
                 except KeyError:
                     try:
-                        entry =next(self._solid_iter)
+                        entry = next(self._solid_iter)
                     except StopIteration:
                         raise LookupError(F'Failed to find item at offset 0x{item.offset:08X}.')
                     self.entries[entry.offset - self.entry_offset_delta] = entry.data
@@ -1125,7 +1129,7 @@ class NSArchive(Struct):
             data = self.src.read(size)
             if len(data) != size:
                 raise EOFError('Unexpected end of stream while decompressing archive.')
-            return NSArchive.Entry(offset, data, size)
+            return NSArchive.Entry(offset, data, size + 4)
 
     class DeflateReader(LengthPrefixed):
         def __next__(self):

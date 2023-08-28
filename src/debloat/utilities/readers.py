@@ -5,7 +5,6 @@
 from __future__ import annotations
 import io
 import itertools
-import contextlib
 import enum
 import struct
 import re
@@ -29,6 +28,7 @@ class StreamDetour:
         self.whence = whence
 
     def __enter__(self) -> io.IOBase:
+        self.cursor = self.stream.tell()
         if self.offset is not None:
             self.stream.seek(self.offset, self.whence)
         return self.stream

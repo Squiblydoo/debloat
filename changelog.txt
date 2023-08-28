@@ -1,3 +1,10 @@
+1.5.3.1
+- Fixed NSIS extractor bug. 
+	- Bug was caused due to the failure of adding some bytes when iterating through NSIS entries.
+	- Bug was caused by a missing variable.
+- Updated the imports for nsisParser and readers
+	- (Somehow?) It was working without these needing to be explicitly mentioned, but it has been updated for completeness.
+
 1.5.3
 - Fixed alignment bug
 	- There was a bug where I was subtracting instead of adding bytes to fix alignment. It now adds instead of subtracts.
