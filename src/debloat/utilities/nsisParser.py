@@ -4,9 +4,12 @@
 
 from collections import namedtuple
 import struct
-from debloat.utilities.readers import *
+
 import enum
 
+import itertools
+import re
+import io
 import dataclasses
 
 import zlib
@@ -16,7 +19,8 @@ import bz2
 from datetime import datetime
 
 import logging
-from typing import BinaryIO, NamedTuple, Iterable, Iterator, Callable, Union, ByteString, Optional
+from typing import BinaryIO, NamedTuple, Iterable, Iterator, Callable, Union, ByteString, Optional, List, Dict
+from debloat.utilities.readers import StructReader, Struct, StreamDetour, MemoryFile
 
 logging.basicConfig(level=logging.WARN)
 

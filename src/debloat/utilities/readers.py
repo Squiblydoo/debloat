@@ -5,7 +5,6 @@
 from __future__ import annotations
 import io
 import itertools
-import contextlib
 import enum
 import struct
 import re
