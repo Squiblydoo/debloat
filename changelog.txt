@@ -1,3 +1,10 @@
+1.5.3.2
+- Fixed a bug with the RSRC trimming
+	- These were some long standing issues:
+		- The default threshold and default size_limit were brought into conformance with Refinery Trim
+		- With the previously high threshold, it could result in problems from removing the entire resource.
+		- I also reverted the compression method in this section. The one used elsewhere was found not to be compatible with this part of the processing.
+
 1.5.3.1
 - Fixed NSIS extractor bug. 
 	- Bug was caused due to the failure of adding some bytes when iterating through NSIS entries.
