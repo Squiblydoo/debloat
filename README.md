@@ -89,6 +89,9 @@ Windows<br>
 Linux<br> 
 `pyinstaller --onefile --noconsole --icon=debloat.ico --collect-all tkinterdnd2 gui.py`
 
+## Want to discuss?
+Consider joining the [debloat Discord](discord.gg/dvGXKaY5qr).
+
 ## Credits
 Big shoutout to Jesko Hüttenhain creator of [Binary Refinery](https://github.com/binref/refinery). The NSIS extraction is based on his reverse engineering of the NSIS file format. Check out Binary Refinery if you have not.
 
