@@ -499,10 +499,7 @@ class NSHeader(Struct):
                 else:
                     return F'${variable}'
             return F'Error:$V:{index}'
-        
-    def _string_code_language(self, index: int) -> str:
-        return F'$LANGUAGE:{index}'
-
+            
     @property
     def _read_char(self) -> str:
         return self.strings.u16 if self.unicode else self.strings.u8
