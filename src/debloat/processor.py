@@ -93,10 +93,11 @@ def handle_signature_abnormality(signature_address: int,
 def check_and_extract_NSIS(possible_header: bytearray, pe: pefile.PE) -> list:
     '''Check if the PE is an NSIS installer.'''
     extractor = nsisParser.extractNSIS()
-    guess = extractor._find_archive_offset(memoryview(possible_header))
-    if guess is not None:
-        files = extractor.unpack(memoryview(pe.__data__))
-        return files
+    confirm_if_nsis = extractor._find_archive_offset(memoryview(possible_header))
+    if confirm_if_nsis is None:
+        return
+    extracted_files = extractor.unpack(memoryview(pe.__data__))
+    return extracted_files
 
 def check_for_packer(possible_header: bytearray) -> int:
     '''Check overlay bytes for known packers.'''

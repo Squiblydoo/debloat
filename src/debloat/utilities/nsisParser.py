@@ -69,6 +69,40 @@ class ArchiveUnit:
             meta[self.args.date.decode(self.codec)] = date
         return UnpackResult(path, data, **meta)
 
+class DeflateFile(io.RawIOBase):
+
+    def __init__(self, data: MemoryFile):
+        self.data = data
+        self.dc = zlib.decompressobj(-15)
+
+    def readall(self) -> bytes:
+        return self.read()
+
+    def readinto(self, __buffer):
+        data = self.read(len(__buffer))
+        size = len(data)
+        __buffer[:size] = data
+        return size
+
+    def read(self, size=-1):
+        buffer = self.dc.unconsumed_tail or self.data.read(size)
+        kwargs = {}
+        if size > 0:
+            kwargs.update(max_length=size)
+        return self.dc.decompress(buffer, **kwargs)
+
+    def readable(self) -> bool:
+        return True
+
+    def seekable(self) -> bool:
+        return False
+
+    def writable(self) -> bool:
+        return False
+
+    def write(self, __b):
+        raise NotImplementedError
+
 class LZMAOptions(NamedTuple):
     filter_flag: bool
     dictionary_size: int
@@ -348,6 +382,8 @@ class NSHeaderFlags(enum.IntFlag):
     ExternalFile = 64
     IsStubInstaller = 128
 
+
+
 class NSType(enum.IntEnum):
     Nsis2 = 0
     Nsis3 = enum.auto()
@@ -499,7 +535,10 @@ class NSHeader(Struct):
                 else:
                     return F'${variable}'
             return F'Error:$V:{index}'
-            
+        
+    def _string_code_language(self, index: int) -> str:
+        return F'$LANGUAGE:{index}'
+
     @property
     def _read_char(self) -> str:
         return self.strings.u16 if self.unicode else self.strings.u8
@@ -609,14 +648,20 @@ class NSHeader(Struct):
                 string.write(chr(letter))
                 continue
             if code.special:
-                var1 = next(chars)
+                try:
+                    var1 = next(chars)
+                except StopIteration:
+                    break
                 if var1 == 0:
                     break
                 if code is NSCharCode.SKIP:
                     letter = var1
                 else:
                     if not self.unicode:
-                        var2 = next(chars)
+                        try:
+                            var2 = next(chars)
+                        except StopIteration:
+                                break
                         if var2 == 0:
                             break
                         vars = var1, var2
@@ -831,7 +876,7 @@ class NSHeader(Struct):
                     time = datetime.fromtimestamp(arg[4] << 32 | arg[3])
                 except Exception:
                     time = None
-                item = NSItem(arg[2], time)
+                item = NSItem(arg[2], mtime=time)
                 set_path(arg[1])
                 items.append(item)
                 if not self._is_var_str(arg[1], 10):
@@ -856,6 +901,8 @@ class NSHeader(Struct):
                         item = items[-1]
                         item.attributes = arg[1]
             elif cmd is Op.WRITEUNINSTALLER:
+                if arg[4] or arg[5] or arg[0] <=1 or arg[3] <= 1:
+                    continue
                 if not self._is_good_string(arg[0]):
                     continue
                 if self._bad_cmd in range(Op.WRITEUNINSTALLER):
@@ -972,26 +1019,30 @@ class NSArchive(Struct):
         B'\xEF\xBE\xAD\xDE' B'nsis' B'inst' B'all\0',  # v1.0
     ]
 
-    class Entry(NamedTuple):
+    @dataclasses.dataclass
+    class Entry:
         offset: int
         data: bytearray
         compressed_size: int
+        decompression_failed: bool = False
 
 
     def __init__(self, reader: StructReader[bytearray]):
         self.flags = NSHeaderFlags(reader.u32())
-        self.magic = reader.read(0x10)
-        self.size_of_header = reader.u32()
-        self.size_of_archive = reader.u32()
-        self.offset_archive = reader.tell()
-        self.size_of_body = self.size_of_archive - self.offset_archive
-        if self.size_of_body < 0:
+        self.signature = reader.read(0x10)
+        header_data = None
+        header_size = reader.u32()
+        header_data_length = None
+        archive_size = reader.u32()
+        self.archive_offset = reader.tell()
+        body_size = archive_size - self.archive_offset
+        if body_size < 0:
             raise ValueError("Invalid archive size")
-        if self.size_of_header < self.offset_archive:
+        if header_size < self.archive_offset:
             raise ValueError("Invalid header size")
-        if reader.remaining_bytes < self.size_of_body:
+        if reader.remaining_bytes < body_size:
             raise ValueError(
-                F'Header indicates archive size 0x{self.size_of_archive:08X}, '
+                F'Header indicates archive size 0x{archive_size:08X}, '
                 F'but only 0x{reader.remaining_bytes:08X} bytes remain.')
     
         # Prepare to check compression format. This takes
@@ -999,7 +1050,7 @@ class NSArchive(Struct):
         preview_bytes = bytes(reader.peek(4))
         preview_value = int.from_bytes(preview_bytes, byteorder='little')
         
-        # The default "solid" value is True and default methos is deflate.
+        # The default "solid" value is True and default method is deflate.
         # Regarding Solid:
         # "If /SOLID is used, all of the installer data is compressed in one block. This results in greater compression ratios."
         # We determine if the compression is solid or not by checking the headers.
@@ -1008,8 +1059,6 @@ class NSArchive(Struct):
         self.solid = True
         self.lzma_options: Optional[LZMAOptions] = None
         self.method = NSMethod.Deflate
-        
-        header_data = None
 
         # Header Matching Logic:
         #  X is the header size as given by the first header
@@ -1019,6 +1068,7 @@ class NSArchive(Struct):
         # 5D 00 00 DD DD 00 __ __ __ __ __  solid LZMA
         # 00 5D 00 00 DD DD 00 __ __ __ __  solid LZMA, empty filter
         # 01 5D 00 00 DD DD 00 __ __ __ __  solid LZMA, BCJ filter
+         # __ __ __ 80 5D 00 00 DD DD 00 __  non-solid LZMA
         # __ __ __ 80 00 5D 00 00 DD DD 00  non-solid LZMA, empty filter
         # __ __ __ 80 01 5D 00 00 DD DD 00  non-solid LZMA, BCJ filter
         # __ __ __ 80 01 0T __ __ __ __ __  non-solid BZip
@@ -1034,21 +1084,19 @@ class NSArchive(Struct):
             self.lzma_options = LZMAOptions(filter_flag, reader.u32())
             return True
         
-        def bzipcheck(second_preview):
-            if second_preview[1] < 0xE:
-                return True
-            return False
+        def bzipcheck(preview):
+            return preview[0] == 0x31 and preview[1] < 14
         
-        if preview_value == self.size_of_header:
+        if preview_value == header_size:
             self.solid = False
-            header_data = reader.read_exactly(self.size_of_header)
+            header_data = reader.read_exactly(header_size)
             self.method = NSMethod.Copy
         elif lzmacheck(preview_bytes):
             self.method = NSMethod.LZMA
         elif preview_bytes[3] == 0x80:
             self.solid = False
             reader.seek_relative(4)
-            second_preview = reader.peek(4)
+            second_preview = bytes(reader.peek(4))
             if lzmacheck(second_preview):
                 self.method = NSMethod.LZMA
             elif bzipcheck(second_preview):
@@ -1056,7 +1104,7 @@ class NSArchive(Struct):
         elif bzipcheck(preview_bytes):
             self.method = NSMethod.BZip2
 
-        reader.seek_set(self.offset_archive)
+        reader.seek_set(self.archive_offset)
         self.entries: Dict[int, bytearray] = {}
         self.entry_offset_delta = 0
         self._solid_iter = None
@@ -1072,16 +1120,16 @@ class NSArchive(Struct):
                 ) from ZLERR
             if self.solid:
                 self._solid_iter = item 
-            self.entry_offset_delta = header_entry.compressed_size
+            self.entry_offset_delta = header_entry.compressed_size + 4
             header_data = header_entry.data
         else:
             self.entry_offset_delta = len(header_data)
 
         if not header_data:
             raise ValueError("Empty header")
-        logging.debug(F'Header size: 0x{self.size_of_header:08X}')
+        logging.debug(F'Header size: 0x{header_size:08X}')
 
-        self.header = NSHeader(header_data, size=self.size_of_header)
+        self.header = NSHeader(header_data, size=header_size)
         self.reader = reader
         
     @property
@@ -1090,13 +1138,13 @@ class NSArchive(Struct):
     
     @property
     def offset_items(self):
-        return self.offset_archive + self.entry_offset_delta
+        return self.archive_offset + self.entry_offset_delta
     
-    def _extract_item_data(self, item: NSItem):
+    def _extract_item_data(self, item: NSItem) -> Entry:
         if self.solid:
             while True:
                 try:
-                    data = self.entries[item.offset]
+                    entry = self.entries[item.offset]
                 except KeyError:
                     try:
                         entry = next(self._solid_iter)
@@ -1104,11 +1152,12 @@ class NSArchive(Struct):
                         raise LookupError(F'Failed to find item at offset 0x{item.offset:08X}.')
                     self.entries[entry.offset - self.entry_offset_delta] = entry.data
                 else: 
-                    return data
+                    return entry
         else:
             self.reader.seek(self.offset_items + item.offset)
             decompressed = self._decompress_items(self.reader)
-            return next(decompressed).data
+            entry = next(decompressed).data
+            return entry
 
     class LengthPrefixed(Iterable[Entry]):
         def __init__(self, src: BinaryIO):
@@ -1123,26 +1172,29 @@ class NSArchive(Struct):
             if len(size) != 4:
                 raise StopIteration
             size = int.from_bytes(size, byteorder='little')
-            data = self.src.read(size)
-            if len(data) != size:
-                raise EOFError('Unexpected end of stream while decompressing archive.')
-            return NSArchive.Entry(offset, data, size + 4)
+            read = size & 0x7FFFFFFF
+            data = self.src.read(read)
+            if len(data) != read:
+                raise EOFError('Unexpected end of stream while decompressing archive entries.')
+            return NSArchive.Entry(offset, data, size)
 
-    class DeflateReader(LengthPrefixed):
+    class DecompressionReader(LengthPrefixed):
+        def __init__(self, src: BinaryIO, decompressor: Callable[[bytes], bytes]):
+            super().__init__(src)
+            self._dc = decompressor
+
         def __next__(self):
-            offset = self.src.tell()
-            size = self.src.read(4)
-            if len(size) != 4:
-                raise StopIteration
-            size = int.from_bytes(size, byteorder='little')
-            inflated = bool(size & 0x80000000)
-            size &= 0x7FFFFFFF
-            data = self.src.read(size)
-            if inflated:
-                data = zlib.decompress(data, -15)
-            return NSArchive.Entry(offset, data, size + 4)               
+            item = super().__next__()
+            is_compressed = bool(item.compressed_size & 0x80000000)
+            item.compressed_size &= 0x7FFFFFFF
+            if is_compressed:
+                try:
+                    item.data = self._dc(item.data)
+                except Exception:
+                    item.decompression_failed = True
+            return item              
         
-    class LZMAInjectWraper:
+    class LZMAFix:
         ''' Creates a wrapper to compensate for how NSIS handles LZMA'''
         def __init__(self, src: MemoryFile):
             self._src = src
@@ -1168,24 +1220,18 @@ class NSArchive(Struct):
 
     def _decompress_items(self, reader: StructReader[bytearray]) -> Iterator[Entry]:
         """ Decompresses the items in the archive. """
-        if self.method is NSMethod.Deflate:
-            return self.DeflateReader(reader)
-        else:
-            if self.method is NSMethod.LZMA:
-                decompressor = lzma.LZMADecompressor()
-                try: 
-                    decompressor.decompress(reader.peek(32))
-                except:
-                    reader = self.LZMAInjectWraper(reader)
-            
-            wrapper = {
-                NSMethod.LZMA: lzma.LZMAFile,
-                NSMethod.BZip2: bz2.BZ2File,
-            }.get(self.method)
-
-            if wrapper is not None:
-                reader = wrapper(reader)
-            return self.LengthPrefixed(reader)
+        def NSISLZMAFile(d):
+            return lzma.LZMAFile(self.LZMAFix(d))
+        decompressor = {
+            NSMethod.Deflate : DeflateFile,
+            NSMethod.LZMA    : NSISLZMAFile,
+            NSMethod.BZip2   : bz2.BZ2File,
+        }[self.method]
+        if self.solid:
+            return self.LengthPrefixed(decompressor(reader))
+        return self.DecompressionReader(reader, 
+            lambda d: decompressor(MemoryFile(d)).read())
+        
 
 class extractNSIS(ArchiveUnit):
     """
@@ -1205,7 +1251,7 @@ class extractNSIS(ArchiveUnit):
                             signature[position] = 0x2E
                         yield changes, bytes(signature)
         best_guess = None
-        search_space = data
+        search_space = memoryview(data)
         for flaws, sig in signatures(*NSArchive.MAGICS):
             if flaws > 1:
                 search_space = search_space[:0x20_000]
@@ -1235,6 +1281,7 @@ class extractNSIS(ArchiveUnit):
         return best_guess
 
     def unpack(self, data: memoryview):
+        memory = memoryview(data)
         before = -1
         _error = None
         while True:
@@ -1243,7 +1290,7 @@ class extractNSIS(ArchiveUnit):
                 _error = _error or ValueError("Unable to find NSIS archive marker")
                 raise _error
             try:
-                archive = NSArchive(data[offset:])
+                archive = NSArchive(memory[offset:])
             except Exception as e:
                 _error = e
                 before = offset
@@ -1266,17 +1313,6 @@ class extractNSIS(ArchiveUnit):
             logging.info(F'{item.path} at 0x{item.offset:08X}, {len(data)} bytes')
         unpacked_items.append(self._pack('setup.nsis', None, archive.script.encode('utf-8'))) 
         return unpacked_items
-        
 
-    def find_archive_offset(data: bytearray) -> int:
-        """ Returns the offset of the NSIS archive within the provided data. """
-        for magic in NSArchive.MAGICS:
-            offset = data.find(magic)
-            if offset != -1:
-                return offset
-        return -1
-        
-    # Check for magic bytes within the provided file
-    def magic_bytes(data: bytearray) -> bool:
-        return any(magic in data for magic in NSArchive.MAGICS)
-    
+
+
