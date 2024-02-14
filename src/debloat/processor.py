@@ -93,10 +93,11 @@ def handle_signature_abnormality(signature_address: int,
 def check_and_extract_NSIS(possible_header: bytearray, pe: pefile.PE) -> list:
     '''Check if the PE is an NSIS installer.'''
     extractor = nsisParser.extractNSIS()
-    guess = extractor._find_archive_offset(memoryview(possible_header))
-    if guess is not None:
-        files = extractor.unpack(memoryview(pe.__data__))
-        return files
+    confirm_if_nsis = extractor._find_archive_offset(memoryview(possible_header))
+    if confirm_if_nsis is None:
+        return
+    extracted_files = extractor.unpack(memoryview(pe.__data__))
+    return extracted_files
 
 def check_for_packer(possible_header: bytearray) -> int:
     '''Check overlay bytes for known packers.'''
@@ -504,7 +505,7 @@ def process_pe(pe: pefile.PE, out_path: str, last_ditch_processing: bool,
                                                         beginning_file_size)
     if signature_abnormality:
         log_message('''
-We detected data after the signature. This is abnormal. Removing signature and extra data...''')
+    We detected data after the signature. This is abnormal. Removing signature and extra data...''')
         data_to_delete.append((signature_address, beginning_file_size))
     # Handle Overlays: this includes packers and overlays which are completely junk
     elif pe.get_overlay_data_start_offset() and signature_size < len(pe.__data__) - pe.get_overlay_data_start_offset():
