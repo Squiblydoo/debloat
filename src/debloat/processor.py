@@ -505,7 +505,7 @@ def process_pe(pe: pefile.PE, out_path: str, last_ditch_processing: bool,
                                                         beginning_file_size)
     if signature_abnormality:
         log_message('''
-We detected data after the signature. This is abnormal. Removing signature and extra data...''')
+    We detected data after the signature. This is abnormal. Removing signature and extra data...''')
         data_to_delete.append((signature_address, beginning_file_size))
     # Handle Overlays: this includes packers and overlays which are completely junk
     elif pe.get_overlay_data_start_offset() and signature_size < len(pe.__data__) - pe.get_overlay_data_start_offset():
