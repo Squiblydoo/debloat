@@ -14,20 +14,31 @@ import dataclasses
 
 import zlib
 import lzma
-import bz2
 
 from datetime import datetime
 
 import logging
-from typing import BinaryIO, NamedTuple, Iterable, Iterator, Callable, Union, ByteString, Optional, List, Dict
 from debloat.utilities.readers import StructReader, Struct, StreamDetour, MemoryFile
+from debloat.utilities.pyflate import BZip2File
+from typing import (
+    BinaryIO, 
+    NamedTuple, 
+    Iterable, 
+    Iterator, 
+    Callable, 
+    Union, 
+    ByteString, 
+    Optional, 
+    List, 
+    Dict,
+    Type)
 
 logging.basicConfig(level=logging.WARN)
 
 class UnpackResult:
 
     def get_data(self) -> ByteString:
-        if callable(self.data):
+        if Callable(self.data):
             self.data = self.data()
         return self.data
 
@@ -71,9 +82,14 @@ class ArchiveUnit:
 
 class DeflateFile(io.RawIOBase):
 
-    def __init__(self, data: MemoryFile):
+    data: MemoryFile
+    dc: zlib.decompress
+
+    def __new__(cls, data: MemoryFile):
+        self = super().__new__(cls)
         self.data = data
         self.dc = zlib.decompressobj(-15)
+        return io.BufferedReader(self)
 
     def readall(self) -> bytes:
         return self.read()
@@ -1159,15 +1175,16 @@ class NSArchive(Struct):
             entry = next(decompressed).data
             return entry
 
-    class LengthPrefixed(Iterable[Entry]):
+    class PartsReader(Iterable[Entry]):
         def __init__(self, src: BinaryIO):
             self.src = src
+            self.pos = 0
 
         def __iter__(self):
             return self
         
         def __next__(self):
-            offset = self.src.tell()
+            offset = self.pos
             size = self.src.read(4)
             if len(size) != 4:
                 raise StopIteration
@@ -1176,10 +1193,11 @@ class NSArchive(Struct):
             data = self.src.read(read)
             if len(data) != read:
                 raise EOFError('Unexpected end of stream while decompressing archive entries.')
+            self.pos = offset + size + 4
             return NSArchive.Entry(offset, data, size)
 
-    class DecompressionReader(LengthPrefixed):
-        def __init__(self, src: BinaryIO, decompressor: Callable[[bytes], bytes]):
+    class SolidReader(PartsReader):
+        def __init__(self, src: BinaryIO, decompressor: Type[BinaryIO]):
             super().__init__(src)
             self._dc = decompressor
 
@@ -1189,7 +1207,8 @@ class NSArchive(Struct):
             item.compressed_size &= 0x7FFFFFFF
             if is_compressed:
                 try:
-                    item.data = self._dc(item.data)
+                    dc = self._dc(MemoryFile(item.data))
+                    item.data = dc.read()
                 except Exception:
                     item.decompression_failed = True
             return item              
@@ -1222,15 +1241,14 @@ class NSArchive(Struct):
         """ Decompresses the items in the archive. """
         def NSISLZMAFile(d):
             return lzma.LZMAFile(self.LZMAFix(d))
-        decompressor = {
+        decompressor: Type[BinaryIO]= {
             NSMethod.Deflate : DeflateFile,
             NSMethod.LZMA    : NSISLZMAFile,
-            NSMethod.BZip2   : bz2.BZ2File,
+            NSMethod.BZip2   : BZip2File,
         }[self.method]
         if self.solid:
-            return self.LengthPrefixed(decompressor(reader))
-        return self.DecompressionReader(reader, 
-            lambda d: decompressor(MemoryFile(d)).read())
+            return self.PartsReader(decompressor(reader))
+        return self.SolidReader(reader, decompressor)
         
 
 class extractNSIS(ArchiveUnit):
