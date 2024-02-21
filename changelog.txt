@@ -1,3 +1,18 @@
+1.5.3.4
+- NSIS Parser improvements
+	- Additional use cases for NSIS were identified and tested. These identified additional bugs which are fixed in this version. These use cases were added and tested:
+		- bzip2_liquid
+		- bzip2_solid
+		- lzma_liquid
+		- lzma_solid
+		- zlib_liquid
+		- zlib_solid
+
+1.5.3.3
+- Modified NSIS Parser significantly.
+	- Two use cases were identified where the parser were not working adequately. This resulted in identifying two logic bugs which resulted in fixing one and a large rewrite of some portions of the NSIS Parser. Rewrite was done by Huettenhain (https://github.com/huettenhain) for the original project of the NSIS Parser (https://github.com/binref/refinery) and then was incorporated into Debloat by me (Squiblydoo).
+	- Removed some code that was unused.
+
 1.5.3.2
 - Fixed a bug with the RSRC trimming
 	- These were some long standing issues:

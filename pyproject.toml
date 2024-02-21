@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "debloat"
-version = "1.5.3.2"
+version = "1.5.3.4"
 authors = [
   { name="Squiblydoo", email="Squiblydoo@pm.me" },
 ]
