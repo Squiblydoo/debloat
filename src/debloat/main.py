@@ -16,7 +16,7 @@ RESULT_CODES = {
     6: "Bloat in PE resources",
     7: "Bloat in PE section",
     8: "Bloat in .NET resource",
-    9: "Low compression overlay",
+    9: "Non-essential, high entropy overlay",
     10: "High compression with bytes at end.",
     11: ".NET Single File with junk"
 }

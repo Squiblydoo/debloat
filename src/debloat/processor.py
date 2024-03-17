@@ -25,15 +25,6 @@ import debloat.utilities.rsrc as rsrc
 _KB = 1000
 _MB = _KB * _KB
 
-RESULT_CODES = {
-    0: "No Solution found.",
-    1: "Junk after signature.",
-    2: "Single repeated byte in overlay.",
-    3: "Pattern in overlay.",
-    4: "Sets of repeated bytes in overlay.",
-    5: "NSIS Installer.",
-}
-
 def readable_size(value: int) -> str:
     '''Return bytes in human readable format.'''
     if value <= 1024:
