@@ -1,3 +1,16 @@
+1.5.4
+- General Improvements
+	- This version prints report codes indicating which inflation tactic is identified.
+	- This version can now handle instances where no pattern exists within the junk data, or the pattern is disrupted by a few characters. This version uses the trimming method from binary refinery in two cases that were found to be more efficient.
+	- A performance testing script has been included.
+
+The new updates hand a few edge use-cases that were not solvable before and fixes one bug.
+
+	Bugfix: If debloat was unable to trim a inflated section, it would tell you it could and then exit telling you that it could not.
+
+	New use-case solved: This solves the use-case where there a pattern exists in the overlay, but additional bytes have been added to disrupt the pattern. As much as 1 byte is enough to disrupt the pattern. This is not a problem anymore.
+
+
 1.5.3.4
 - NSIS Parser improvements
 	- Additional use cases for NSIS were identified and tested. These identified additional bugs which are fixed in this version. These use cases were added and tested:

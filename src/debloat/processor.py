@@ -497,8 +497,8 @@ def process_pe(pe: pefile.PE, out_path: str, last_ditch_processing: bool,
             last_section = find_last_section(pe)
             overlay = memoryview(pe.__data__)[last_section.PointerToRawData + last_section.SizeOfRawData:signature_address or beginning_file_size]
 
-            overlay_compression_sample = get_compressed_size(memoryview(overlay)[-5000:], 5000)
-            sample_compression = overlay_compression_sample / 5000
+            overlay_compression_sample = get_compressed_size(memoryview(overlay)[-1000:], 1000)
+            sample_compression = overlay_compression_sample / 1000
             file_size_wo_overlay = len(memoryview(pe.__data__)[:last_section.PointerToRawData + last_section.SizeOfRawData])
             if sample_compression < 0.05:
                 end_of_real_data, result_code = trim_junk(pe, overlay, beginning_file_size)
