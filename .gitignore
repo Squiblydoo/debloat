@@ -5,3 +5,6 @@ virt/
 src/debloat.egg-info/
 src/debloat/dist
 src/debloat/.vscode
+src/debloat/samples
+src/debloat/UnSorted_samples
+src/debloat/Old_Sample_Set

@@ -25,10 +25,6 @@ import debloat.utilities.rsrc as rsrc
 _KB = 1000
 _MB = _KB * _KB
 
-PACKER = {
-    1 : "Nullsoft"
-}
-
 def readable_size(value: int) -> str:
     '''Return bytes in human readable format.'''
     if value <= 1024:
@@ -58,8 +54,7 @@ def write_multiple_files(out_path: str,
     log_message("The user will need to determine which file is malicious if any.")
     log_message("If a file is bloated: resubmit it through the tool to debloat it.")
     log_message(f"Consider reviewing the 'setup.nsis' from the installer to determine how the files were meant to be used.")
-
-    return
+    return 
 
 
 def write_patched_file(out_path: str,
@@ -99,25 +94,6 @@ def check_and_extract_NSIS(possible_header: bytearray, pe: pefile.PE) -> list:
     extracted_files = extractor.unpack(memoryview(pe.__data__))
     return extracted_files
 
-def check_for_packer(possible_header: bytearray) -> int:
-    '''Check overlay bytes for known packers.'''
-    # TODO: Evalute any other packers that need special processing.
-
-    # NullSoft is not a packer, but an installer. We will detect this. It cannot be processed at this time
-    NULLSOFT_MAGICS = [
-        # https://nsis.sourceforge.io/Can_I_decompile_an_existing_installer
-        B'\xEF\xBE\xAD\xDE' B'Null' B'soft' B'Inst',   # v1.6
-        B'\xEF\xBE\xAD\xDE' B'Null' B'Soft' B'Inst',   # v1.3
-        B'\xED\xBE\xAD\xDE' B'Null' B'Soft' B'Inst',   # v1.1
-        B'\xEF\xBE\xAD\xDE' B'nsis' B'inst' B'all\0',  # v1.0
-    ]
-
-    for magic in range(len(NULLSOFT_MAGICS)):
-        packer_header_match = re.search(NULLSOFT_MAGICS[magic], possible_header)
-        if packer_header_match:
-             # Future: Handle NSIS installers
-            return 1 # Nullsoft
-    return 0
 
 def find_last_section(pe: pefile.PE) -> Optional[pefile.SectionStructure]:
     '''Iterate through PE sections to identify the last one.'''
@@ -181,19 +157,20 @@ def adjust_offsets(pe: pefile.PE, gap_offset: int, gap_size: int):
             setattr(structure, attribute, new_value)
 
     it: Iterable[Structure] = iter(pe.__structures__)
+    remove = []
 
-    for structure in it:
+    for index, structure in enumerate(it):
         old_offset = structure.get_file_offset()
         new_offset = old_offset - gap_offset
 
         if old_offset > gap_offset:
+            if old_offset < gap_offset + gap_size:
+                remove.append(index)
+                continue
             if isinstance(structure, SectionStructure) and new_offset % alignment != 0:
                 raise RuntimeError(
                     F'section {(structure.Name)} would be moved to offset 0x{new_offset:X}, '
                     F'violating section alignment value 0x{alignment:X}.')
-            if old_offset < gap_offset + gap_size:
-                raise RuntimeError(
-                    F'structure starts inside removed region: {structure}')
             structure.set_file_offset(new_offset)
 
         adjust_attributes_of_structure(structure, rva_offset, rva_lbound, rva_ubound, (
@@ -229,19 +206,21 @@ def adjust_offsets(pe: pefile.PE, gap_offset: int, gap_size: int):
         ):
             if not hasattr(structure, attribute):
                 continue
+    
+    while remove:
+        index = remove.pop()
+        pe.__structures__[index:index + 1] = []
 
     section.SizeOfRawData = new_section_size
     return pe
 
 
-def refinery_strip(pe: pefile.PE, data: memoryview, block_size=_MB) -> int:
-    threshold = 0.05
-    alignment = pe.OPTIONAL_HEADER.FileAlignment
-    data_overhang = len(data) % alignment
-    result = data_overhang
-
+def refinery_strip(data: memoryview, alignment=1, block_size=_MB) -> int:
     if not data:
         return 0
+    threshold = 0.05
+    data_overhang = len(data) % alignment
+    result = data_overhang
 
     if 0 < threshold < 1:
         def compression_ratio(offset: int):
@@ -249,6 +228,7 @@ def refinery_strip(pe: pefile.PE, data: memoryview, block_size=_MB) -> int:
             return ratio
         upper = len(data)
         lower = result
+
         if compression_ratio(upper) <= threshold:
             while block_size < upper - lower:
                 pivot = (lower + upper) // 2
@@ -259,21 +239,20 @@ def refinery_strip(pe: pefile.PE, data: memoryview, block_size=_MB) -> int:
                 upper = pivot
                 if abs(ratio - threshold) < 1e-10:
                     break
-        result = upper
 
-    match = re.search(B'(?s).(?=\\x%02x+$)' % data[result - 1], data[:result])
-    if match is not None:
-        cutoff = match.start() - 1
-        length = result - cutoff
-        if length > block_size:
-            result = cutoff
+        result = upper
+    
+    while result > 1 and data[result - 2] == data[result -1]:
+        result -= 1
 
     result = max(result, data_overhang)
 
     result = result + (data_overhang - result) % alignment
 
-    while result > len(data):
-        result -= alignment
+    if result > len(data):
+        excess = result - len(data)
+        excess = excess + (-excess % alignment)
+        result = result - excess
 
     return result
 
@@ -316,7 +295,7 @@ def refinery_trim_resources(pe: pefile.PE, data_to_delete: List) -> int:
             if slice_start <= original_offset:
                 original_offset += slice_end-slice_start
         old_size = resource.Size
-        new_size = refinery_strip(pe, memoryview(pe.__data__)[original_offset:original_offset + old_size])
+        new_size = refinery_strip(memoryview(pe.__data__)[original_offset:original_offset + old_size], pe.OPTIONAL_HEADER.FileAlignment)
         gap_size = old_size - new_size
         if gap_size <= 0:
             continue
@@ -359,7 +338,7 @@ def check_section_compression(pe: pefile.PE, data_to_delete: List,
             log_message("Section: "  + section_name, end="\t", flush=True)
             log_message(" Compression Ratio: " + str(round(section_compression_ratio, 2)) +"%", end="\t",flush=True)
             log_message("Size of section: " + readable_size(section.SizeOfRawData) +".",flush=True)
-            if biggest_section == None:
+            if biggest_section is None:
                 biggest_section = section
                 biggest_uncompressed = section_compression_ratio
             elif section.SizeOfRawData > biggest_section.SizeOfRawData:
@@ -373,7 +352,9 @@ def check_section_compression(pe: pefile.PE, data_to_delete: List,
 Bloat was located in the resource section. Removing bloat..
 ''')
             refinery_trim_resources(pe, data_to_delete)
-            return result
+            result_code = 6 # Bloated resource
+            return result, result_code
+
         elif biggest_section.Name.decode() == ".text\x00\x00\x00":
             # Data stored in the .text section is often a .NET Resource. The following checks
             # to confirm it is .NET and then drops the resources.
@@ -381,7 +362,8 @@ Bloat was located in the resource section. Removing bloat..
                 log_message('''
 Bloat was detected in the text section. Bloat is likely in a .NET Resource
 This use case cannot be processed at this time. ''')
-            return result
+            result_code = 0 # No solution 
+            return result, result_code
         if biggest_uncompressed > 3000:
             log_message('''
 The compression ratio of ''' + biggest_section.Name.decode() + ''' is indicative of a bloated section.
@@ -390,15 +372,19 @@ The compression ratio of ''' + biggest_section.Name.decode() + ''' is indicative
             biggest_section_end = biggest_section.PointerToRawData + biggest_section.SizeOfRawData
             original_section_size = biggest_section.SizeOfRawData
             biggest_section_data = memoryview(pe.__data__)[biggest_section.PointerToRawData:biggest_section_end]
-
-            delta_last_non_junk = trim_junk(pe, biggest_section_data, original_section_size)
+            delta_last_non_junk, result_code = trim_junk(pe, biggest_section_data, original_section_size)
             # Remove the junk from the section.
+            if delta_last_non_junk > original_section_size:
+                log_message("Section was not able to be reduced.")
+                return result
             data_to_delete.append((biggest_section.PointerToRawData + delta_last_non_junk, biggest_section_end))
+            
             section_bytes_to_remove = original_section_size - delta_last_non_junk
             # Adjust all offsets for the file.
             adjust_offsets(pe, biggest_section.PointerToRawData, section_bytes_to_remove)
             log_message("Bloated section reduced.")
-            return result
+            result_code = 7 # Bloated PE section
+            return result, result_code
 
 def find_chunk_start(targeted_regex, chunk_start, original_size_with_junk, bloated_content: memoryview, step):
     bloated_content_len = len(bloated_content)
@@ -432,32 +418,17 @@ def trim_junk(pe: pefile.PE, bloated_content: memoryview,
     junk_match = re.search(rb'^(..)\1{20,}', bytes(bloated_content[:-601:-1]))
     chunk_start = 0
     if not junk_match:
-        # Second Method: If "not junk_match" check for junk larger than 1 repeating byte
-        # Brute force check: check to see if there are 1-20 bytes
-        # being repeated and feed the number into the regex
-        for i in range(300):
-            # Regex Explained:
-            # Starting at the end of the PE, check for repeated bytes.
-            # This indicates junk bytes in the overlay. Match that set
-            # of repeated bytes 1 or more times.
-            junk_regex = rb"^(..{" + bytes(str(i), "utf-8") + rb"})\1{2,}"
-            multibyte_junk_regex = re.search(junk_regex, bytes(bloated_content[:-1001:-1]))
-            if multibyte_junk_regex:
-                # Having found the pattern, we can make the regex efficient
-                # by targeting the pattern using the "targeted_regex"
-                targeted_regex = rb"(" + binascii.hexlify(multibyte_junk_regex.group(1)) + rb")\1{1,}"
-                chunk_start = find_chunk_start(targeted_regex, chunk_start, original_size_with_junk, bloated_content, 1000)
-                break
-                # It was determined that data cannot be removed any more
-                # from the chunk_start. But the value of chunk_start
-                # now tells us how much data we can safely remove.
-        delta_last_non_junk -= chunk_start
+        # Second method: remove junk using refinery_strip. This method
+        # is more efficent than a previous check that was used here.
+        delta_last_non_junk = refinery_strip(bloated_content, alignment)
+        result_code = 3 # Pattern in overlay.
+
     # Junk was identified. A new size is assigned and returned.
     else:
+        # First method continued...
         bloated_content_len = len(bloated_content)
         targeted_regex = rb"("+ binascii.hexlify(junk_match.group(1)) + rb")\1{1,}"
         precompiled_chunk = binascii.hexlify(junk_match.group(1)) * int(1000/len(junk_match.group(1)))
-        #compiled_targeted_regex = re.compile(targeted_regex)
         chunk_end = chunk_start
         while original_size_with_junk > chunk_end:
             chunk_end = chunk_start + 1000
@@ -473,28 +444,30 @@ def trim_junk(pe: pefile.PE, bloated_content: memoryview,
                     chunk_start -= 1000
                 break
         junk_to_remove = chunk_start 
+
         # Third Method: check for a series of one repeated byte.
         # If the trimming did not remove more than half of the bytes then
         # this suggests the attacker may have put a random series of
-        # repeated bytes. These will be removed by loading the overlay
-        # 200 bytes at a time and removing parts which repeat for more
-        # than 20 bytes.
+        # repeated bytes. We use refinery_trim for efficiency.
         if junk_to_remove * 2 < original_size_with_junk / 2:
-            chunk_start = junk_to_remove
-            targeted_regex = rb'(..)\1{20,}'
-            junk_to_remove = find_chunk_start(targeted_regex, chunk_start, original_size_with_junk, bloated_content, 200)
+            delta_last_non_junk = refinery_strip(bloated_content, alignment)
+            result_code = 4 # Sets of repeated bytes in overlay.
+        else:
+            result_code = 2 # Single repeated byte in overlay
         delta_last_non_junk -= junk_to_remove
 
     # The returned size must account for the file alignment.
     # We will make sure it is aligned by adding bytes.
     not_aligned = alignment - (delta_last_non_junk % alignment)
     delta_last_non_junk = delta_last_non_junk + not_aligned
-
-    return delta_last_non_junk
+    if not result_code:
+        result_code = 0
+    return delta_last_non_junk, result_code
 
 def process_pe(pe: pefile.PE, out_path: str, last_ditch_processing: bool,
                log_message: Callable[[str], None], beginning_file_size: int = 0) -> None:
     '''Prepare PE, perform checks, remote junk, write patched binary.'''
+    result_code = 0
     if not beginning_file_size:
         beginning_file_size = len(pe.write())
     # Remove Signature and modify size of Optional Header Security entry.
@@ -507,6 +480,8 @@ def process_pe(pe: pefile.PE, out_path: str, last_ditch_processing: bool,
         log_message('''
     We detected data after the signature. This is abnormal. Removing signature and extra data...''')
         data_to_delete.append((signature_address, beginning_file_size))
+        result_code = 1  # Junk after signture
+
     # Handle Overlays: this includes packers and overlays which are completely junk
     elif pe.get_overlay_data_start_offset() and signature_size < len(pe.__data__) - pe.get_overlay_data_start_offset():
         possible_header = pe.__data__[pe.get_overlay_data_start_offset():pe.get_overlay_data_start_offset() + 30]
@@ -514,18 +489,21 @@ def process_pe(pe: pefile.PE, out_path: str, last_ditch_processing: bool,
         nsis_extracted = check_and_extract_NSIS(possible_header, pe)
         if nsis_extracted:
             write_multiple_files(out_path, nsis_extracted, log_message)
-            return 0
-        log_message("An overlay was detected. Checking for known packer.")
-        packer_idenfitied = check_for_packer(possible_header)
-        if packer_idenfitied:
-            log_message("Packer identified: " + PACKER[packer_idenfitied])
-            if PACKER[1]:
-                log_message("Nullsoft Installer, but unable to extract.")
+            result_code = 5 # NSIS Installer
+            return result_code
+
         else:
-            log_message("Packer not identified. Attempting dynamic trim...")
+            log_message("Attempting dynamic trim...")
             last_section = find_last_section(pe)
             overlay = memoryview(pe.__data__)[last_section.PointerToRawData + last_section.SizeOfRawData:signature_address or beginning_file_size]
-            end_of_real_data = trim_junk(pe, overlay, beginning_file_size)
+
+            overlay_compression_sample = get_compressed_size(memoryview(overlay)[-1000:], 1000)
+            sample_compression = overlay_compression_sample / 1000
+            file_size_wo_overlay = len(memoryview(pe.__data__)[:last_section.PointerToRawData + last_section.SizeOfRawData])
+            if sample_compression < 0.05:
+                end_of_real_data, result_code = trim_junk(pe, overlay, beginning_file_size)
+            else:
+                end_of_real_data = beginning_file_size
             if end_of_real_data > beginning_file_size * 0.9:
                 if last_ditch_processing is True:
                     log_message("""
@@ -547,7 +525,7 @@ Debloat with the "--last-ditch" parameter."""
     else:
         # In order to solve some use cases, we will find the biggest section
         # within the binary.
-        result = check_section_compression(pe, data_to_delete, log_message=log_message)
+        result, result_code = check_section_compression(pe, data_to_delete, log_message=log_message)
         log_message(result)
     # All processing is done. Report results.
     # There is always the signature in the list
@@ -557,6 +535,8 @@ sample for additional analysis.
 Email: Squiblydoo@pm.me
 Twitter: @SquiblydooBlog.
                     """)
+        result_code = 0
+        return result_code
     else:
         pe_data = bytearray()
         start = 0
@@ -579,3 +559,4 @@ Twitter: @SquiblydooBlog.
                     + readable_size(final_filesize) + ".")
         log_message("Processing complete.\nFile written to '" \
                     + str(new_pe_name) + "'.")
+        return result_code

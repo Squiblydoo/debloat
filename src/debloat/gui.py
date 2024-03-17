@@ -9,6 +9,22 @@ from tkinterdnd2 import DND_FILES, TkinterDnD
 import pefile
 import debloat.processor
 
+RESULT_CODES = {
+    0: "No Solution found.",
+    1: "Junk after signature.",
+    2: "Single repeated byte in overlay.",
+    3: "Pattern in overlay.",
+    4: "Sets of repeated bytes in overlay.",
+    5: "NSIS Installer.",
+    6: "Bloat in PE resources",
+    7: "Bloat in PE section",
+    8: "Bloat in .NET resource",
+    9: "Non-essential, high entropy overlay",
+    10: "High compression with bytes at end.",
+    11: ".NET Single File with junk"
+}
+
+
 class MainWindow(TkinterDnD.Tk):
     def __init__(self) -> None:
         '''Define main GUI window.'''
@@ -86,10 +102,11 @@ with an executable. Maybe it needs unzipped?''')
         out_path = file_path.parent \
             / f"{file_path.stem}_patched{file_path.suffix}"
 
-        debloat.processor.process_pe(pe,  out_path, 
+        result_code = debloat.processor.process_pe(pe,  out_path, 
                                      self.unsafe_processing.get(), 
                    log_message=self.output_scrollbox_handler,
                    beginning_file_size=file_size)
+        self.output_scrollbox_handler("Tactic identified: " , RESULT_CODES.get(result_code) +"\n")
         self.output_scrollbox_handler("-----Processing took %s seconds ---\n" \
                                     % round((time.time() - start_time), 2))
         self.clear_pathbox()
