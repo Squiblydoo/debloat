@@ -8,28 +8,14 @@ from typing import Tuple, Optional, Any
 from tkinterdnd2 import DND_FILES, TkinterDnD
 import pefile
 import debloat.processor
-
-RESULT_CODES = {
-    0: "No Solution found.",
-    1: "Junk after signature.",
-    2: "Single repeated byte in overlay.",
-    3: "Pattern in overlay.",
-    4: "Sets of repeated bytes in overlay.",
-    5: "NSIS Installer.",
-    6: "Bloat in PE resources",
-    7: "Bloat in PE section",
-    8: "Bloat in .NET resource",
-    9: "Non-essential, high entropy overlay",
-    10: "High compression with bytes at end.",
-    11: ".NET Single File with junk"
-}
-
+from debloat.processor import DEBLOAT_VERSION
+from debloat.processor import RESULT_CODES
 
 class MainWindow(TkinterDnD.Tk):
     def __init__(self) -> None:
         '''Define main GUI window.'''
         TkinterDnD.Tk.__init__(self)
-        self.title("Debloat")
+        self.title("Debloat " + DEBLOAT_VERSION)
         # I removed the Tkinter Icon since it didn't work on most 
         # platforms and just caused more problems than necessary.
         self.geometry("600x600")

@@ -1,3 +1,11 @@
+1.5.5
+- General Improvements
+	- Added functionality to print debloat version/ added to GUI UI
+	- Deduped results_codes into processor file
+- New Use Case
+	- Identified a use case that wasn't being solved, improved program logic to solve.
+		- Packed files with a bloated section. 
+
 1.5.4
 - General Improvements
 	- This version prints report codes indicating which inflation tactic is identified.

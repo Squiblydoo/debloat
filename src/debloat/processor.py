@@ -22,6 +22,25 @@ from typing import Generator, Iterable, Optional
 import debloat.utilities.nsisParser as nsisParser
 import debloat.utilities.rsrc as rsrc
 
+DEBLOAT_VERSION = "1.5.4.1"
+
+RESULT_CODES = {
+    0: "No Solution found.",
+    1: "Junk after signature.",
+    2: "Single repeated byte in overlay.",
+    3: "Pattern in overlay.",
+    4: "Sets of repeated bytes in overlay.",
+    5: "NSIS Installer.",
+    6: "Bloat in PE resources",
+    7: "Bloat in PE section",
+    8: "Bloat in .NET resource",
+    9: "Non-essential, high entropy overlay",
+    10: "High compression with bytes at end.",
+    11: ".NET Single File with junk",
+    12: "Packed file with bloated section"
+}
+
+
 _KB = 1000
 _MB = _KB * _KB
 
@@ -496,14 +515,21 @@ def process_pe(pe: pefile.PE, out_path: str, last_ditch_processing: bool,
             log_message("Attempting dynamic trim...")
             last_section = find_last_section(pe)
             overlay = memoryview(pe.__data__)[last_section.PointerToRawData + last_section.SizeOfRawData:signature_address or beginning_file_size]
-
+            
+            # The following checks a sample of the overlay to determine if it will be able to be removed.
             overlay_compression_sample = get_compressed_size(memoryview(overlay)[-1000:], 1000)
             sample_compression = overlay_compression_sample / 1000
             file_size_wo_overlay = len(memoryview(pe.__data__)[:last_section.PointerToRawData + last_section.SizeOfRawData])
             if sample_compression < 0.05:
                 end_of_real_data, result_code = trim_junk(pe, overlay, beginning_file_size)
             else:
-                end_of_real_data = beginning_file_size
+                result, result_code = check_section_compression(pe, data_to_delete, log_message=log_message)
+                if len(data_to_delete) == 1:
+                    end_of_real_data = beginning_file_size
+                else:
+                    result_code = 12
+                    end_of_real_data = beginning_file_size - sum(slice_end-slice_start for slice_start, slice_end in data_to_delete)
+
             if end_of_real_data > beginning_file_size * 0.9:
                 if last_ditch_processing is True:
                     log_message("""
@@ -518,6 +544,9 @@ However, if the file does not run after this, it is in indicator that this metho
 Overlay was unable to be trimmed. Try unpacking with UniExtract2 or re-running
 Debloat with the "--last-ditch" parameter."""
                                 )
+            elif result_code == 12:
+                # The end was already determined and no more data needs to be removed.
+                pass
             else:
                 data_to_delete.append((end_of_real_data, beginning_file_size))
     # Handle bloated sections

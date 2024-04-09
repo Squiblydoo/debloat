@@ -5,21 +5,9 @@ from pathlib import Path
 import argparse
 import pefile
 import debloat.processor
+from debloat.processor import DEBLOAT_VERSION
+from debloat.processor import RESULT_CODES
 
-RESULT_CODES = {
-    0: "No Solution found.",
-    1: "Junk after signature.",
-    2: "Single repeated byte in overlay.",
-    3: "Pattern in overlay.",
-    4: "Sets of repeated bytes in overlay.",
-    5: "NSIS Installer.",
-    6: "Bloat in PE resources",
-    7: "Bloat in PE section",
-    8: "Bloat in .NET resource",
-    9: "Non-essential, high entropy overlay",
-    10: "High compression with bytes at end.",
-    11: ".NET Single File with junk"
-}
 
 def main() -> int:
     parser = argparse.ArgumentParser()
@@ -36,6 +24,7 @@ def main() -> int:
     whole PE Overlay as a last resort if no smarter method works.
                             """,
                         action='store_true', default=False)
+    parser.add_argument("-v", "--version", action='version', version='debloat version ' + DEBLOAT_VERSION, help="Prints program version")
     args = parser.parse_args()
 
     file_path = args.executable
