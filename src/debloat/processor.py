@@ -22,7 +22,7 @@ from typing import Generator, Iterable, Optional
 import debloat.utilities.nsisParser as nsisParser
 import debloat.utilities.rsrc as rsrc
 
-DEBLOAT_VERSION = "1.5.4.1"
+DEBLOAT_VERSION = "1.5.5"
 
 RESULT_CODES = {
     0: "No Solution found.",
@@ -527,7 +527,7 @@ def process_pe(pe: pefile.PE, out_path: str, last_ditch_processing: bool,
                 if len(data_to_delete) == 1:
                     end_of_real_data = beginning_file_size
                 else:
-                    result_code = 12
+                    result_code = 12 # Packed with junk in section
                     end_of_real_data = beginning_file_size - sum(slice_end-slice_start for slice_start, slice_end in data_to_delete)
 
             if end_of_real_data > beginning_file_size * 0.9:
