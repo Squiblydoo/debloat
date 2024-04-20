@@ -24,6 +24,13 @@ def main() -> int:
     whole PE Overlay as a last resort if no smarter method works.
                             """,
                         action='store_true', default=False)
+    parser.add_argument("-c", "--cert", dest="cert_preservation", 
+                        help="""
+    Preserve the certificate on the end of the file if there is a certificate.
+    The certificate will no longer be valid.""",
+                        action='store_true',
+                        required=False,
+                        default=False)
     parser.add_argument("-v", "--version", action='version', version='debloat version ' + DEBLOAT_VERSION, help="Prints program version")
     args = parser.parse_args()
 
@@ -49,6 +56,7 @@ Maybe it needs unzipped?'''
     result_code = debloat.processor.process_pe(pe, 
                         out_path=str(out_path), 
                         last_ditch_processing=args.last_ditch_processing,
+                        cert_preservation=args.cert_preservation,
                         log_message=print,
                         beginning_file_size=file_size
                         )

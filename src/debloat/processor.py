@@ -123,12 +123,15 @@ def find_last_section(pe: pefile.PE) -> Optional[pefile.SectionStructure]:
             last_section = section
     return last_section
 
-def get_signature_info(pe: pefile.PE) -> Tuple[int, int]:
+def get_signature_info(pe: pefile.PE, cert_preservation) -> Tuple[int, int]:
     '''Remove PE signature and update header.'''
     signature_address = pe.OPTIONAL_HEADER.DATA_DIRECTORY[pefile.DIRECTORY_ENTRY['IMAGE_DIRECTORY_ENTRY_SECURITY']].VirtualAddress
     signature_size = pe.OPTIONAL_HEADER.DATA_DIRECTORY[pefile.DIRECTORY_ENTRY['IMAGE_DIRECTORY_ENTRY_SECURITY']].Size
     pe.OPTIONAL_HEADER.DATA_DIRECTORY[pefile.DIRECTORY_ENTRY['IMAGE_DIRECTORY_ENTRY_SECURITY']].VirtualAddress = 0
-    pe.OPTIONAL_HEADER.DATA_DIRECTORY[pefile.DIRECTORY_ENTRY['IMAGE_DIRECTORY_ENTRY_SECURITY']].Size = 0
+    # If the cert is to be preservered, we do not need to modify the size in the header.
+    if cert_preservation == False:
+        pe.OPTIONAL_HEADER.DATA_DIRECTORY[pefile.DIRECTORY_ENTRY['IMAGE_DIRECTORY_ENTRY_SECURITY']].Size = 0
+
 
     return signature_address, signature_size
 
@@ -484,21 +487,27 @@ def trim_junk(pe: pefile.PE, bloated_content: memoryview,
     return delta_last_non_junk, result_code
 
 def process_pe(pe: pefile.PE, out_path: str, last_ditch_processing: bool,
-               log_message: Callable[[str], None], beginning_file_size: int = 0) -> None:
+                cert_preservation: bool,log_message: Callable[[str], None], 
+                beginning_file_size: int = 0) -> None:
     '''Prepare PE, perform checks, remote junk, write patched binary.'''
     result_code = 0
     if not beginning_file_size:
         beginning_file_size = len(pe.write())
     # Remove Signature and modify size of Optional Header Security entry.
-    signature_address, signature_size = get_signature_info(pe)
-    data_to_delete = [(signature_address, signature_address + signature_size)]
+    signature_address, signature_size = get_signature_info(pe, cert_preservation)
+    if cert_preservation == True:
+        cert = [(signature_address, signature_address + signature_size)]
+        data_to_delete = []
+    else:
+        data_to_delete = [(signature_address, signature_address + signature_size)]
+
     signature_abnormality = handle_signature_abnormality(signature_address,
                                                         signature_size,
                                                         beginning_file_size)
     if signature_abnormality:
         log_message('''
     We detected data after the signature. This is abnormal. Removing signature and extra data...''')
-        data_to_delete.append((signature_address, beginning_file_size))
+        data_to_delete.append((signature_address + signature_size, beginning_file_size))
         result_code = 1  # Junk after signture
 
     # Handle Overlays: this includes packers and overlays which are completely junk
@@ -558,7 +567,7 @@ Debloat with the "--last-ditch" parameter."""
         log_message(result)
     # All processing is done. Report results.
     # There is always the signature in the list
-    if len(data_to_delete) == 1 or sum(slice_end-slice_start for slice_start, slice_end in data_to_delete) <= (beginning_file_size * 0.1):
+    if len(data_to_delete) == 0 or sum(slice_end-slice_start for slice_start, slice_end in data_to_delete) <= (beginning_file_size * 0.1):
         log_message("""No automated method for reducing the size worked. Please consider sharing the
 sample for additional analysis.
 Email: Squiblydoo@pm.me
@@ -573,6 +582,8 @@ Twitter: @SquiblydooBlog.
             pe_data += bytearray(pe.__data__[start:slice_start])
             start = slice_end
         pe_data += bytearray(pe.__data__[start:beginning_file_size])
+        if cert_preservation == True and signature_size > 0:
+            pe.OPTIONAL_HEADER.DATA_DIRECTORY[pefile.DIRECTORY_ENTRY['IMAGE_DIRECTORY_ENTRY_SECURITY']].VirtualAddress = len(pe_data) - signature_size
 
         pe.__data__ = pe_data
         final_filesize, new_pe_name = write_patched_file(out_path,
