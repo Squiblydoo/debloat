@@ -128,10 +128,9 @@ def get_signature_info(pe: pefile.PE, cert_preservation) -> Tuple[int, int]:
     signature_address = pe.OPTIONAL_HEADER.DATA_DIRECTORY[pefile.DIRECTORY_ENTRY['IMAGE_DIRECTORY_ENTRY_SECURITY']].VirtualAddress
     signature_size = pe.OPTIONAL_HEADER.DATA_DIRECTORY[pefile.DIRECTORY_ENTRY['IMAGE_DIRECTORY_ENTRY_SECURITY']].Size
     pe.OPTIONAL_HEADER.DATA_DIRECTORY[pefile.DIRECTORY_ENTRY['IMAGE_DIRECTORY_ENTRY_SECURITY']].VirtualAddress = 0
-    # If the cert is to be preservered, we do not need to modify the size in the header.
+    # If the cert is to be preservered, we do not need to modify the size in the header. 
     if cert_preservation == False:
         pe.OPTIONAL_HEADER.DATA_DIRECTORY[pefile.DIRECTORY_ENTRY['IMAGE_DIRECTORY_ENTRY_SECURITY']].Size = 0
-
 
     return signature_address, signature_size
 
@@ -398,6 +397,7 @@ The compression ratio of ''' + biggest_section.Name.decode() + ''' is indicative
             # Remove the junk from the section.
             if delta_last_non_junk > original_section_size:
                 log_message("Section was not able to be reduced.")
+                result_code = 0
                 return result
             data_to_delete.append((biggest_section.PointerToRawData + delta_last_non_junk, biggest_section_end))
             
@@ -493,20 +493,21 @@ def process_pe(pe: pefile.PE, out_path: str, last_ditch_processing: bool,
     result_code = 0
     if not beginning_file_size:
         beginning_file_size = len(pe.write())
+
     # Remove Signature and modify size of Optional Header Security entry.
     signature_address, signature_size = get_signature_info(pe, cert_preservation)
     if cert_preservation == True:
         cert = [(signature_address, signature_address + signature_size)]
         data_to_delete = []
     else:
+        if signature_size > 0:
+            log_message("""A certificate is being removed from this file.\n-To preserve the certificate use the Cert Preservation option.""")
         data_to_delete = [(signature_address, signature_address + signature_size)]
 
     signature_abnormality = handle_signature_abnormality(signature_address,
                                                         signature_size,
                                                         beginning_file_size)
     if signature_abnormality:
-        log_message('''
-    We detected data after the signature. This is abnormal. Removing signature and extra data...''')
         data_to_delete.append((signature_address + signature_size, beginning_file_size))
         result_code = 1  # Junk after signture
 
