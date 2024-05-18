@@ -1,3 +1,10 @@
+1.5.6
+- Cert Support
+	- Added support in both CLI and GUI to preserve the authenticode certificate.
+		- Authenticode certificate is removed by default because the certificate becomes invalid. When it becomes invalid it becomes unclear whether the certificate was always invalid or not.
+- Bug Fix
+	- A result code was missing which could cause problems in processing that looked for a result code.
+
 1.5.5
 - General Improvements
 	- Added functionality to print debloat version/ added to GUI UI

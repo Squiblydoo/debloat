@@ -42,6 +42,12 @@ class MainWindow(TkinterDnD.Tk):
                                          variable=self.unsafe_processing)
         self.unsafe_checkbox.pack()
 
+        self.cert_preservation = BooleanVar(value=False)
+        self.cert_checkbox = Checkbutton(self, 
+                                        text="Preserve Cert. Cert will be invalid but informational.",
+                                        variable=self.cert_preservation)
+        self.cert_checkbox.pack()
+
         
 
         # Define Scrollbox for output of program.
@@ -90,6 +96,7 @@ with an executable. Maybe it needs unzipped?''')
 
         result_code = debloat.processor.process_pe(pe,  out_path, 
                                      self.unsafe_processing.get(), 
+                                     self.cert_preservation.get(),
                    log_message=self.output_scrollbox_handler,
                    beginning_file_size=file_size)
         self.output_scrollbox_handler("Tactic identified: " , RESULT_CODES.get(result_code) +"\n")

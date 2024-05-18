@@ -3,9 +3,11 @@
 # Debloat
 Debloat is a GUI and CLI tool to remove excess garbage from bloated executables.
 
-By excess garbage, I mean 100 - 800 MB of junk bytes added to a binary to keep it from going into a sandbox.
+By excess garbage, I mean 100 - 800 MB of junk bytes added to a binary to keep it from going into a sandbox. This method of adding junk is called "inflating" or "pumping" a binary. Debloat currently handles the 10 most common inflation tactics.
 
-Being built with Python, the code and logic is easily accessible for others to take the concepts and apply them to their own tools. The program can be compiled for Windows, MacOS, Linux. The GUI removes any need for remembering commandline options and reading through CLI manuals: it is intended to be as simple as possible. The logic within the program handles the different use cases automatically.
+Being built with Python, the application can easily be leveraged in other workflows. Currently, debloat is used by [CCCS's AssemblyLine](https://www.cyber.gc.ca/en/tools-services/assemblyline) and [CERT Polska's MWDB](https://github.com/CERT-Polska/karton-archive-extractor).
+
+ The program can be compiled for Windows, MacOS, Linux. The GUI and CLI have minimal options: it is intended to be as simple as possible and the logic within the program handles the different use cases automatically.
 
 Compiled binaries have already been included in the [Releases](https://github.com/Squiblydoo/debloat/releases/).
 
@@ -31,7 +33,7 @@ The gui can also be launched from the CLI using the command `debloat-gui`.
 
 ## Does it always work?
 Not yet.
-My unscientific guess is that it should work for every 7 of 8 binaries. There are specific usecases I know where it does not work and I am working to implement solutions for those usecases. 
+My unscientific guess is that it should work for every 9 of 10 binaries. There are specific usecases I know where it does not work and I am working to implement solutions for those usecases. 
 
 In previous versions, `debloat` could accidentally remove too much of the binary. That is no longer the case unless you use the "--last-ditch" switch. If you ever need this switch, consider sharing the sample for additional analysis. This option has now been added to the GUI. Functionally, what the function does is it will remove the whole overlay, if there is one. In some cases this is necessary as no pattern for the junk was found---this is most commonly the case in samples that do not compress well.
 
