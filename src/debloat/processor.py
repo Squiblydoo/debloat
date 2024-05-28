@@ -398,7 +398,7 @@ The compression ratio of ''' + biggest_section.Name.decode() + ''' is indicative
             if delta_last_non_junk > original_section_size:
                 log_message("Section was not able to be reduced.")
                 result_code = 0
-                return result
+                return result, result_code
             data_to_delete.append((biggest_section.PointerToRawData + delta_last_non_junk, biggest_section_end))
             
             section_bytes_to_remove = original_section_size - delta_last_non_junk
