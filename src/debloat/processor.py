@@ -383,7 +383,7 @@ Bloat was located in the resource section. Removing bloat..
                 log_message('''
 Bloat was detected in the text section. Bloat is likely in a .NET Resource
 This use case cannot be processed at this time. ''')
-            result_code = 0 # No solution 
+            result_code = 0 # No solution
             return result, result_code
         if biggest_uncompressed > 3000:
             log_message('''
@@ -407,6 +407,10 @@ The compression ratio of ''' + biggest_section.Name.decode() + ''' is indicative
             log_message("Bloated section reduced.")
             result_code = 7 # Bloated PE section
             return result, result_code
+
+        # If no bloat was found, return an expected return value
+        result_code = 0 # No solution
+        return result, result_code
 
 def find_chunk_start(targeted_regex, chunk_start, original_size_with_junk, bloated_content: memoryview, step):
     bloated_content_len = len(bloated_content)
