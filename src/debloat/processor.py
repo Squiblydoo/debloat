@@ -22,7 +22,7 @@ from typing import Generator, Iterable, Optional
 import debloat.utilities.nsisParser as nsisParser
 import debloat.utilities.rsrc as rsrc
 
-DEBLOAT_VERSION = "1.5.5"
+DEBLOAT_VERSION = "1.5.6.2"
 
 RESULT_CODES = {
     0: "No Solution found.",
@@ -359,10 +359,7 @@ def check_section_compression(pe: pefile.PE, data_to_delete: List,
             log_message("Section: "  + section_name, end="\t", flush=True)
             log_message(" Compression Ratio: " + str(round(section_compression_ratio, 2)) +"%", end="\t",flush=True)
             log_message("Size of section: " + readable_size(section.SizeOfRawData) +".",flush=True)
-            if biggest_section is None:
-                biggest_section = section
-                biggest_uncompressed = section_compression_ratio
-            elif section.SizeOfRawData > biggest_section.SizeOfRawData:
+            if biggest_section is None or section.SizeOfRawData > biggest_section.SizeOfRawData:
                 biggest_section = section
                 biggest_uncompressed = section_compression_ratio
         # Handle specific bloated sections
@@ -383,7 +380,7 @@ Bloat was located in the resource section. Removing bloat..
                 log_message('''
 Bloat was detected in the text section. Bloat is likely in a .NET Resource
 This use case cannot be processed at this time. ''')
-            result_code = 0 # No solution 
+            result_code = 0 # No solution
             return result, result_code
         if biggest_uncompressed > 3000:
             log_message('''
@@ -407,6 +404,10 @@ The compression ratio of ''' + biggest_section.Name.decode() + ''' is indicative
             log_message("Bloated section reduced.")
             result_code = 7 # Bloated PE section
             return result, result_code
+
+        # If no bloat was found, return an expected return value
+        result_code = 0 # No solution
+        return result, result_code
 
 def find_chunk_start(targeted_regex, chunk_start, original_size_with_junk, bloated_content: memoryview, step):
     bloated_content_len = len(bloated_content)
