@@ -26,7 +26,7 @@ args = argparser.parse_args()
 def process_samples(sample, directory):
     file_size=os.path.getsize(args.directory +"/"+ sample)
     setup = f"import pefile; import debloat; filename = '{args.directory}/{sample}'; "
-    code = f"binary = pefile.PE(filename, fast_load=True); result= debloat.processor.process_pe(binary, filename + '.patched', last_ditch_processing=False, cert_preservation=True, log_message=lambda *args, **kwargs: None, beginning_file_size={file_size}); print(result, end=' ')"
+    code = f"binary = pefile.PE(filename, fast_load=True); result= debloat.processor.process_pe(binary, filename + '.patched', last_ditch_processing=False, cert_preservation=False, log_message=lambda *args, **kwargs: None, beginning_file_size={file_size}); print(result, end=' ')"
 
     if args.mem:
         mem_profiler(setup, code, file_size, sample, directory)

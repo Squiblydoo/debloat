@@ -1,3 +1,11 @@
+1.5.6.2
+- Bug Fix
+	- Not all possible paths returned a result code. An additional result code was added.
+
+1.5.6.1
+- Bug Fix
+	- Added the result code for real this time.
+
 1.5.6
 - Cert Support
 	- Added support in both CLI and GUI to preserve the authenticode certificate.
