@@ -33,7 +33,7 @@ The gui can also be launched from the CLI using the command `debloat-gui`.
 
 ## Does it always work?
 Not yet.
-Based on my recent analysis, debloat is able to [remove junk files 97.8% of the time](https://x.com/SquiblydooBlog/status/1795419380991291424) from bloated files.
+Based on my recent analysis, debloat is able to [remove junk from bloated files 97.8% of the time](https://x.com/SquiblydooBlog/status/1795419380991291424).
 
 In previous versions, `debloat` could accidentally remove too much of the binary. That is no longer the case unless you use the "--last-ditch" switch. If you ever need this switch, consider sharing the sample for additional analysis. This option has now been added to the GUI. Functionally, what the function does is it will remove the whole overlay, if there is one. In some cases this is necessary as no pattern for the junk was found---this is most commonly the case in samples that do not compress well.
 
