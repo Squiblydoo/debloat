@@ -37,7 +37,8 @@ RESULT_CODES = {
     9: "Non-essential, high entropy overlay",
     10: "High compression with bytes at end.",
     11: ".NET Single File with junk",
-    12: "Packed file with bloated section"
+    12: "Packed file with bloated section",
+    13: "Random overlay with high compression"
 }
 
 
@@ -239,7 +240,7 @@ def adjust_offsets(pe: pefile.PE, gap_offset: int, gap_size: int):
 def refinery_strip(data: memoryview, alignment=1, block_size=_MB) -> int:
     if not data:
         return 0
-    threshold = 0.05
+    threshold = 0.15
     data_overhang = len(data) % alignment
     result = data_overhang
 
@@ -260,9 +261,7 @@ def refinery_strip(data: memoryview, alignment=1, block_size=_MB) -> int:
                 upper = pivot
                 if abs(ratio - threshold) < 1e-10:
                     break
-
         result = upper
-    
     while result > 1 and data[result - 2] == data[result -1]:
         result -= 1
 
@@ -499,6 +498,7 @@ def process_pe(pe: pefile.PE, out_path: str, last_ditch_processing: bool,
     signature_address, signature_size = get_signature_info(pe, cert_preservation)
     if cert_preservation == True:
         cert = [(signature_address, signature_address + signature_size)]
+        certData = memoryview(pe.__data__)[signature_address:signature_address + signature_size]
         data_to_delete = []
     else:
         if signature_size > 0:
@@ -528,11 +528,14 @@ def process_pe(pe: pefile.PE, out_path: str, last_ditch_processing: bool,
             overlay = memoryview(pe.__data__)[last_section.PointerToRawData + last_section.SizeOfRawData:signature_address or beginning_file_size]
             
             # The following checks a sample of the overlay to determine if it will be able to be removed.
-            overlay_compression_sample = get_compressed_size(memoryview(overlay)[-1000:], 1000)
-            sample_compression = overlay_compression_sample / 1000
+            overlay_compression_sample = get_compressed_size(memoryview(overlay)[-2000:], 2000)
+            sample_compression = beginning_file_size / overlay_compression_sample 
             file_size_wo_overlay = len(memoryview(pe.__data__)[:last_section.PointerToRawData + last_section.SizeOfRawData])
-            if sample_compression < 0.05:
-                end_of_real_data, result_code = trim_junk(pe, overlay, beginning_file_size)
+            if sample_compression > 400000:
+                required_data_from_overlay, result_code = trim_junk(pe, overlay, beginning_file_size)
+                end_of_real_data = file_size_wo_overlay + required_data_from_overlay
+                data_to_delete.append(((file_size_wo_overlay + required_data_from_overlay), beginning_file_size ))
+                
             else:
                 result, result_code = check_section_compression(pe, data_to_delete, log_message=log_message)
                 if len(data_to_delete) == 1:

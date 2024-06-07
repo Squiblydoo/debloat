@@ -1105,6 +1105,8 @@ class NSArchive(Struct):
         
         if preview_value == header_size:
             self.solid = False
+            header_data_length = header_size
+            reader.seek_relative(4)
             header_data = reader.read_exactly(header_size)
             self.method = NSMethod.Copy
         elif lzmacheck(preview_bytes):
@@ -1136,10 +1138,10 @@ class NSArchive(Struct):
                 ) from ZLERR
             if self.solid:
                 self._solid_iter = item 
-            self.entry_offset_delta = header_entry.compressed_size + 4
+            self.entry_offset_delta = 4 + header_entry.compressed_size
             header_data = header_entry.data
         else:
-            self.entry_offset_delta = len(header_data)
+            self.entry_offset_delta = 4 + len(header_data)
 
         if not header_data:
             raise ValueError("Empty header")
@@ -1175,7 +1177,7 @@ class NSArchive(Struct):
             entry = next(decompressed).data
             return entry
 
-    class PartsReader(Iterable[Entry]):
+    class SolidReader(Iterable[Entry]):
         def __init__(self, src: BinaryIO):
             self.src = src
             self.pos = 0
@@ -1196,8 +1198,8 @@ class NSArchive(Struct):
             self.pos = offset + size + 4
             return NSArchive.Entry(offset, data, size)
 
-    class SolidReader(PartsReader):
-        def __init__(self, src: BinaryIO, decompressor: Type[BinaryIO]):
+    class PartsReader(SolidReader):
+        def __init__(self, src: BinaryIO, decompressor: Optional[Type[BinaryIO]]):
             super().__init__(src)
             self._dc = decompressor
 
@@ -1242,13 +1244,14 @@ class NSArchive(Struct):
         def NSISLZMAFile(d):
             return lzma.LZMAFile(self.LZMAFix(d))
         decompressor: Type[BinaryIO]= {
+            NSMethod.Copy    : None,
             NSMethod.Deflate : DeflateFile,
             NSMethod.LZMA    : NSISLZMAFile,
             NSMethod.BZip2   : BZip2File,
         }[self.method]
         if self.solid:
-            return self.PartsReader(decompressor(reader))
-        return self.SolidReader(reader, decompressor)
+            return self.SolidReader(decompressor(reader))
+        return self.PartsReader(reader, decompressor)
         
 
 class extractNSIS(ArchiveUnit):
