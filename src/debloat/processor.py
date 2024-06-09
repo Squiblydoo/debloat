@@ -22,7 +22,7 @@ from typing import Generator, Iterable, Optional
 import debloat.utilities.nsisParser as nsisParser
 import debloat.utilities.rsrc as rsrc
 
-DEBLOAT_VERSION = "1.5.6.2"
+DEBLOAT_VERSION = "1.5.6.4"
 
 RESULT_CODES = {
     0: "No Solution found.",
@@ -161,20 +161,20 @@ def adjust_offsets(pe: pefile.PE, gap_offset: int, gap_size: int):
     def adjust_attributes_of_structure(
         structure: Structure,
         threshold: int,
-        lbound: Optional[int],
-        ubound: Optional[int],
+        valid_values_lower_bound: Optional[int],
+        valid_values_upper_bound: Optional[int],
         attributes: Iterable[str]
     ):
         for attribute in attributes:
             old_value = getattr(structure, attribute, 0)
-            if old_value <= threshold:
+            if old_value <= gap_offset:
                 continue
-            if lbound is not None and old_value < lbound:
+            if valid_values_lower_bound is not None and old_value < valid_values_lower_bound:
                 continue
-            if ubound is not None and old_value > ubound:
+            if valid_values_upper_bound is not None and old_value > valid_values_upper_bound:
                 continue
             new_value = old_value - gap_size
-            if new_value < 0:
+            if new_value < gap_offset:
                 raise RuntimeError(F'adjusting attribute {attribute} of {structure.name} would result in negative value: {new_value}')
             setattr(structure, attribute, new_value)
 
@@ -195,28 +195,32 @@ def adjust_offsets(pe: pefile.PE, gap_offset: int, gap_size: int):
                     F'violating section alignment value 0x{alignment:X}.')
             structure.set_file_offset(new_offset)
 
-        adjust_attributes_of_structure(structure, rva_offset, rva_lbound, rva_ubound, (
-            'OffsetToData',
-            'AddressOfData',
-            'VirtualAddress',
-            'AddressOfNames',
-            'AddressOfNameOrdinals',
-            'AddressOfFunctions',
-            'AddressOfEntryPoint',
-            'AddressOfRawData',
-            'BaseOfCode',
-            'BaseOfData',
-        ))
-        adjust_attributes_of_structure(structure, tva_offset, tva_lbound, tva_ubound, (
-            'StartAddressOfRawData',
-            'EndAddressOfRawData',
-            'AddressOfIndex',
-            'AddressOfCallBacks',
-        ))
-        adjust_attributes_of_structure(structure, gap_offset, None, None, (
-            'OffsetModuleName',
-            'PointerToRawData',
-        ))
+        try:
+            adjust_attributes_of_structure(structure, rva_offset, rva_lbound, rva_ubound, (
+                'OffsetToData',
+                'AddressOfData',
+                'VirtualAddress',
+                'AddressOfNames',
+                'AddressOfNameOrdinals',
+                'AddressOfFunctions',
+                'AddressOfEntryPoint',
+                'AddressOfRawData',
+                'BaseOfCode',
+                'BaseOfData',
+            ))
+            adjust_attributes_of_structure(structure, tva_offset, tva_lbound, tva_ubound, (
+                'StartAddressOfRawData',
+                'EndAddressOfRawData',
+                'AddressOfIndex',
+                'AddressOfCallBacks',
+            ))
+            adjust_attributes_of_structure(structure, gap_offset, None, None, (
+                'OffsetModuleName',
+                'PointerToRawData',
+            ))
+        except Exception as e:
+            remove.append(index)
+            continue
 
         for attribute in (
             'CvHeaderOffset',
@@ -372,7 +376,7 @@ Bloat was located in the resource section. Removing bloat..
             result_code = 6 # Bloated resource
             return result, result_code
 
-        elif biggest_section.Name.decode() == ".text\x00\x00\x00":
+        elif biggest_section.Name.decode() == ".text\x00\x00\x00" and biggest_uncompressed > 3000:
             # Data stored in the .text section is often a .NET Resource. The following checks
             # to confirm it is .NET and then drops the resources.
             if pe.OPTIONAL_HEADER.DATA_DIRECTORY[14].Size:
@@ -531,7 +535,7 @@ def process_pe(pe: pefile.PE, out_path: str, last_ditch_processing: bool,
             overlay_compression_sample = get_compressed_size(memoryview(overlay)[-2000:], 2000)
             sample_compression = beginning_file_size / overlay_compression_sample 
             file_size_wo_overlay = len(memoryview(pe.__data__)[:last_section.PointerToRawData + last_section.SizeOfRawData])
-            if sample_compression > 400000:
+            if sample_compression > 350000:
                 required_data_from_overlay, result_code = trim_junk(pe, overlay, beginning_file_size)
                 end_of_real_data = file_size_wo_overlay + required_data_from_overlay
                 data_to_delete.append(((file_size_wo_overlay + required_data_from_overlay), beginning_file_size ))
