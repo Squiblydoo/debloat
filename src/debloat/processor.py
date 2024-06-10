@@ -22,7 +22,7 @@ from typing import Generator, Iterable, Optional
 import debloat.utilities.nsisParser as nsisParser
 import debloat.utilities.rsrc as rsrc
 
-DEBLOAT_VERSION = "1.5.6.4"
+DEBLOAT_VERSION = "1.5.6.5"
 
 RESULT_CODES = {
     0: "No Solution found.",
@@ -535,7 +535,7 @@ def process_pe(pe: pefile.PE, out_path: str, last_ditch_processing: bool,
             overlay_compression_sample = get_compressed_size(memoryview(overlay)[-2000:], 2000)
             sample_compression = beginning_file_size / overlay_compression_sample 
             file_size_wo_overlay = len(memoryview(pe.__data__)[:last_section.PointerToRawData + last_section.SizeOfRawData])
-            if sample_compression > 350000:
+            if sample_compression > 400000:
                 required_data_from_overlay, result_code = trim_junk(pe, overlay, beginning_file_size)
                 end_of_real_data = file_size_wo_overlay + required_data_from_overlay
                 data_to_delete.append(((file_size_wo_overlay + required_data_from_overlay), beginning_file_size ))
