@@ -1,3 +1,9 @@
+1.5.6.4
+- Bug Fixes
+	- Fixed logic that could incorrectly flag .text sections as suspicious.
+	- Handled rare error that could occur in updating offsets.
+	- Certificate preservation now works reliably for all use-cases. 
+
 1.5.6.3
 - Bug Fixes
 	- Modified NSIS Parser to address issue identified in the implementation. More details here: https://github.com/binref/refinery/issues/49
