@@ -1,3 +1,7 @@
+1.5.6.5
+- Bug Fix
+	- Inadvertently changed "sample_compression" limit, thought it'd be OK, but it actually causes this check's main purpose to fail (that is, failing quickly when needed). Got some new ideas out of it though.
+
 1.5.6.4
 - Bug Fixes
 	- Fixed logic that could incorrectly flag .text sections as suspicious.
