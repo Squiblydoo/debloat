@@ -503,7 +503,7 @@ def process_pe(pe: pefile.PE, out_path: str, last_ditch_processing: bool,
     if cert_preservation == True:
         cert = [(signature_address, signature_address + signature_size)]
         certData = memoryview(pe.__data__)[signature_address:signature_address + signature_size]
-        data_to_delete = []
+        data_to_delete = [(signature_address, signature_address + signature_size)]
     else:
         if signature_size > 0:
             log_message("""A certificate is being removed from this file.\n-To preserve the certificate use the Cert Preservation option.""")
@@ -592,6 +592,7 @@ Twitter: @SquiblydooBlog.
             start = slice_end
         pe_data += bytearray(pe.__data__[start:beginning_file_size])
         if cert_preservation == True and signature_size > 0:
+            pe_data += certData
             pe.OPTIONAL_HEADER.DATA_DIRECTORY[pefile.DIRECTORY_ENTRY['IMAGE_DIRECTORY_ENTRY_SECURITY']].VirtualAddress = len(pe_data) - signature_size
 
         pe.__data__ = pe_data

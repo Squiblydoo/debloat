@@ -2,6 +2,7 @@
 - Bug Fixes
 	- Fixed logic that could incorrectly flag .text sections as suspicious.
 	- Handled rare error that could occur in updating offsets.
+	- Certificate preservation now works reliably for all use-cases. 
 
 1.5.6.3
 - Bug Fixes
