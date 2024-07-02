@@ -11,6 +11,7 @@ import itertools
 import re
 import io
 import dataclasses
+import ntpath
 
 import zlib
 import lzma
@@ -448,6 +449,23 @@ class NSItem:
     
     def __str__(self) -> str:
         return self.name
+
+    def __eq__(self, other) -> bool:
+        if not other or not isinstance(other, self.__class__):
+            return False
+        return (
+            self.offset == other.offset
+            and self.mtime == other.mtime
+            and self.is_compressed == other.is_compressed
+            and self.is_uninstaller == other.is_uninstaller
+            and self.attributes == other.attributes
+            and self.size == other.size
+            and self.compressed_size == other.compressed_size
+            and self.estimated_size == other.estimated_size
+            and self.dictionary_size == other.dictionary_size
+            and self.patch_size == other.patch_size
+            and ntpath.join(self.prefix or "", self.name) == ntpath.join(other.prefix or "", other.name)
+        )
 
 
 class NSHeader(Struct):
