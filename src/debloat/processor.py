@@ -22,7 +22,7 @@ from typing import Generator, Iterable, Optional
 import debloat.utilities.nsisParser as nsisParser
 import debloat.utilities.rsrc as rsrc
 
-DEBLOAT_VERSION = "1.5.6.5"
+DEBLOAT_VERSION = "1.5.6.6"
 
 RESULT_CODES = {
     0: "No Solution found.",
@@ -38,7 +38,9 @@ RESULT_CODES = {
     10: "High compression with bytes at end.",
     11: ".NET Single File with junk",
     12: "Packed file with bloated section",
-    13: "Random overlay with high compression"
+    13: "Random overlay with high compression",
+    14: "Junk interspersed with data",
+    15: "VMProtected junk",
 }
 
 
@@ -477,6 +479,7 @@ def trim_junk(pe: pefile.PE, bloated_content: memoryview,
         # repeated bytes. We use refinery_trim for efficiency.
         if junk_to_remove * 2 < original_size_with_junk / 2:
             delta_last_non_junk = refinery_strip(bloated_content, alignment)
+            junk_to_remove = 0 # Reset junk_to_remove because Refinery Strip will remove it.
             result_code = 4 # Sets of repeated bytes in overlay.
         else:
             result_code = 2 # Single repeated byte in overlay

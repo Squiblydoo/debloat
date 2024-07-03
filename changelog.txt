@@ -1,3 +1,10 @@
+1.5.6.6
+- Bug Fix
+	- Patches bug in Result-Code 4 where an excess could be removed. 
+		- This was due to a miscalculation. In these instances, the "dynamic trim" and "refinery trim" methods were essentially being applied to the same data, then calculating an excess of junk.
+	- The check for duplicate items in an NSIS Installer has been improved.
+		- Previous check looked for item at the same offset; this version checks to see that all features are the same. 
+
 1.5.6.5
 - Bug Fix
 	- Inadvertently changed "sample_compression" limit, thought it'd be OK, but it actually causes this check's main purpose to fail (that is, failing quickly when needed). Got some new ideas out of it though.
