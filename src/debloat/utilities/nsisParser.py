@@ -11,7 +11,6 @@ import itertools
 import re
 import io
 import dataclasses
-import ntpath
 
 import zlib
 import lzma
@@ -464,7 +463,7 @@ class NSItem:
             and self.estimated_size == other.estimated_size
             and self.dictionary_size == other.dictionary_size
             and self.patch_size == other.patch_size
-            and ntpath.join(self.prefix or "", self.name) == ntpath.join(other.prefix or "", other.name)
+            and self.path == other.path
         )
 
 
