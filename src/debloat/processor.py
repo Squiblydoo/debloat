@@ -355,7 +355,7 @@ def check_section_compression(pe: pefile.PE, data_to_delete: List,
         biggest_uncompressed = int
         result = ""
         for section in pe.sections:
-            section_name = section.Name.decode()
+            section_name = section.Name.decode("utf8", errors="backslashreplace")
             compressed_section_size = get_compressed_size(
                 memoryview(pe.__data__)[section.PointerToRawData : section.PointerToRawData+section.SizeOfRawData],
                 section.SizeOfRawData
@@ -368,7 +368,7 @@ def check_section_compression(pe: pefile.PE, data_to_delete: List,
                 biggest_section = section
                 biggest_uncompressed = section_compression_ratio
         # Handle specific bloated sections
-        if biggest_section.Name.decode() == ".rsrc\x00\x00\x00":
+        if biggest_section.Name.decode("utf8", errors="backslashreplace") == ".rsrc\x00\x00\x00":
             # Get biggest resource or resources and drop them from the
             # Resource table
             log_message('''
@@ -378,7 +378,7 @@ Bloat was located in the resource section. Removing bloat..
             result_code = 6 # Bloated resource
             return result, result_code
 
-        elif biggest_section.Name.decode() == ".text\x00\x00\x00" and biggest_uncompressed > 3000:
+        elif biggest_section.Name.decode("utf8", errors="backslashreplace") == ".text\x00\x00\x00" and biggest_uncompressed > 3000:
             # Data stored in the .text section is often a .NET Resource. The following checks
             # to confirm it is .NET and then drops the resources.
             if pe.OPTIONAL_HEADER.DATA_DIRECTORY[14].Size:
@@ -389,7 +389,7 @@ This use case cannot be processed at this time. ''')
             return result, result_code
         if biggest_uncompressed > 3000:
             log_message('''
-The compression ratio of ''' + biggest_section.Name.decode() + ''' is indicative of a bloated section.
+The compression ratio of ''' + biggest_section.Name.decode("utf8", errors="backslashreplace") + ''' is indicative of a bloated section.
 ''', end="", flush=True)
             # Get the size of the section.
             biggest_section_end = biggest_section.PointerToRawData + biggest_section.SizeOfRawData
