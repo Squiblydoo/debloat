@@ -22,7 +22,7 @@ from typing import Generator, Iterable, Optional
 import debloat.utilities.nsisParser as nsisParser
 import debloat.utilities.rsrc as rsrc
 
-DEBLOAT_VERSION = "1.5.6.6"
+DEBLOAT_VERSION = "1.6.0"
 
 RESULT_CODES = {
     0: "No Solution found.",
@@ -41,6 +41,8 @@ RESULT_CODES = {
     13: "Random overlay with high compression",
     14: "Junk interspersed with data",
     15: "VMProtected junk",
+    16: "InnoSetup Installer",
+    17: "Junk in the certificate",
 }
 
 
@@ -75,7 +77,6 @@ def write_multiple_files(out_path: str,
     log_message("")
     log_message("The user will need to determine which file is malicious if any.")
     log_message("If a file is bloated: resubmit it through the tool to debloat it.")
-    log_message(f"Consider reviewing the 'setup.nsis' from the installer to determine how the files were meant to be used.")
     return 
 
 
@@ -94,7 +95,8 @@ def write_patched_file(out_path: str,
 
 def handle_signature_abnormality(signature_address: int,
                                 signature_size: int,
-                                beginning_file_size: int) -> bool:
+                                beginning_file_size: int,
+                                data_to_delete: List) -> Tuple[bool, int]:
     '''Remove all bytes after a PE signature'''
     # If the signature_address is 0, there was no original signature.
     # We are setting the signature address to the filesize in order to
@@ -103,9 +105,19 @@ def handle_signature_abnormality(signature_address: int,
         signature_address = beginning_file_size
     # Check to see if there is data after the signature; if so, it is
     #  junk data
-    if beginning_file_size > (signature_address + signature_size):
-        return True
-    return False
+    signature_abnormality = False
+    if signature_size > (beginning_file_size - signature_size):
+        result_code = 17
+        signature_abnormality = True
+    elif beginning_file_size > (signature_address + signature_size):
+        result_code = 1
+        signature_abnormality = True
+    
+    if signature_abnormality is True:
+        data_to_delete.append((signature_address + signature_size, beginning_file_size))
+    else: 
+        result_code = 0
+    return signature_abnormality, result_code
 
 def check_and_extract_NSIS(possible_header: bytearray, pe: pefile.PE) -> list:
     '''Check if the PE is an NSIS installer.'''
@@ -503,6 +515,7 @@ def process_pe(pe: pefile.PE, out_path: str, last_ditch_processing: bool,
 
     # Remove Signature and modify size of Optional Header Security entry.
     signature_address, signature_size = get_signature_info(pe, cert_preservation)
+    
     if cert_preservation == True:
         cert = [(signature_address, signature_address + signature_size)]
         certData = memoryview(pe.__data__)[signature_address:signature_address + signature_size]
@@ -512,13 +525,12 @@ def process_pe(pe: pefile.PE, out_path: str, last_ditch_processing: bool,
             log_message("""A certificate is being removed from this file.\n-To preserve the certificate use the Cert Preservation option.""")
         data_to_delete = [(signature_address, signature_address + signature_size)]
 
-    signature_abnormality = handle_signature_abnormality(signature_address,
+    signature_abnormality, result_code = handle_signature_abnormality(signature_address,
                                                         signature_size,
-                                                        beginning_file_size)
-    if signature_abnormality:
-        data_to_delete.append((signature_address + signature_size, beginning_file_size))
-        result_code = 1  # Junk after signture
-
+                                                        beginning_file_size,
+                                                        data_to_delete)
+    if signature_abnormality is True:
+        pass
     # Handle Overlays: this includes packers and overlays which are completely junk
     elif pe.get_overlay_data_start_offset() and signature_size < len(pe.__data__) - pe.get_overlay_data_start_offset():
         possible_header = pe.__data__[pe.get_overlay_data_start_offset():pe.get_overlay_data_start_offset() + 30]
@@ -595,8 +607,11 @@ Twitter: @SquiblydooBlog.
             start = slice_end
         pe_data += bytearray(pe.__data__[start:beginning_file_size])
         if cert_preservation == True and signature_size > 0:
-            pe_data += certData
-            pe.OPTIONAL_HEADER.DATA_DIRECTORY[pefile.DIRECTORY_ENTRY['IMAGE_DIRECTORY_ENTRY_SECURITY']].VirtualAddress = len(pe_data) - signature_size
+            if result_code == 17:
+                log_message("Certificate is being used for junk and will be removed.")
+            else:
+                pe_data += certData
+                pe.OPTIONAL_HEADER.DATA_DIRECTORY[pefile.DIRECTORY_ENTRY['IMAGE_DIRECTORY_ENTRY_SECURITY']].VirtualAddress = len(pe_data) - signature_size
 
         pe.__data__ = pe_data
         final_filesize, new_pe_name = write_patched_file(out_path,

@@ -1,3 +1,10 @@
+1.6.0
+- Improves NSIS Parser to handle an irregular NSIS format
+- Adds solution for Use Case 17
+	- Attackers can include junk marked as the code signing signature. In previous versions, the certificate preservation would preserve the junk. Without certificate preservation, the junk would be removed but return a Result Code of "0 - No Solution Found" even though the file was deflated.
+- Bug Fix
+	- Adds error handling to escape non-unicode PE section names
+
 1.5.6.6
 - Bug Fix
 	- Patches bug in Result-Code 4 where an excess could be removed. 
