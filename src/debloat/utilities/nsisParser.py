@@ -1372,15 +1372,6 @@ class extractNSIS(ArchiveUnit):
             else:
                 break
 
-        # def info():
-        #     yield F'{archive.header.type.name} archive'
-        #     yield F'{archive.method.name.lower()} compression'
-        #     yield F'Mystery value 0x{archive.header.unknown_value:X}'
-        #     yield 'solid archive' if archive.solid else 'non-solid archive'
-        #     yield '64-bit archive' if archive.header.is64bit else '32-bit archive'
-        #     yield 'unicode' if archive.header.unicode else 'ansi'
-        
-        # logging.info(', '.join(info()))
         unpacked_items = []
         for item in archive.header.items:
             unpacked_items.append(self._pack(item.path, item.mtime, archive._extract_item_data(item)))
