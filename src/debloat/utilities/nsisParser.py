@@ -412,6 +412,12 @@ class NSScriptInstruction(Struct):
         self.opcode = reader.u32()
         self.arguments = [reader.u32() for _ in range(6)]
 
+class NSScriptExtendedInstruction(Struct):
+    def __init__(self, reader: StructReader):
+        self.opcode = reader.u32()
+        self.arguments = [reader.u32() for _ in range(8)]
+
+
 class NSCharCode(enum.IntEnum):
     NONE = 0
     CHAR = enum.auto()
@@ -424,7 +430,7 @@ class NSCharCode(enum.IntEnum):
     def special(self):
         return self > NSCharCode.CHAR
     
-@dataclasses.dataclass(eq=True)
+@dataclasses.dataclass
 class NSItem:
     offset: int
     name: Optional[str] = None
@@ -767,6 +773,7 @@ class NSHeader(Struct):
                     continue
             last_non_empty_index = max((k for k, a in enumerate(arg, 1) if a), default=0)
             if cmd == Op.FINDPROC and last_non_empty_index == 0:
+                self._bad_cmd = cmd
                 continue
             if _Op_PARAMETER_COUNT[cmd] < last_non_empty_index:
                 self._bad_cmd = cmd
@@ -840,8 +847,8 @@ class NSHeader(Struct):
                 if mask == 1 << (shift + 2):
                     nt = NSType.Park3
                 if nt != self.type:
-                    self.type = nt
                     got_park_version = True
+                    self.type = nt
         self._find_bad_cmd()
         if self._bad_cmd < Op.REGISTERDLL:
             return
@@ -862,7 +869,7 @@ class NSHeader(Struct):
             self._find_bad_cmd()
             if self._bad_cmd >= Op.SECTIONSET and self._log_cmd_is_enabled:
                 self._log_cmd_is_enabled = False
-                self._find_bad_cmd()   
+                self._find_bad_cmd()
 
     def _read_items(self) -> List[NSItem]:
         prefixes = ['$INSTDIR']
@@ -974,8 +981,8 @@ class NSHeader(Struct):
         return F'$LANGUAGE:{index:04X}'
 
 
-    def __init__(self, reader: StructReader[bytearray], size: int):
-        self.is64bit = size >= 100 and not any(
+    def __init__(self, reader: StructReader[bytearray], size: int, extended: bool):
+        self.is64bit = size >= 4 + 12 * 8 and not any(
             struct.unpack('8xI' * 8, reader.peek(12 * 8)))
         block_header_offset_size = 12 if self.is64bit else 8
         required_size = block_header_offset_size * 8 + 4
@@ -1002,7 +1009,9 @@ class NSHeader(Struct):
         self.type = NSType.Nsis2 # Default to NSIS 2
         
         reader.seek_set(self.block_header_entries.offset)
-        self.instructions: List[NSScriptInstruction] = [NSScriptInstruction(reader) for _ in range(self.block_header_entries.size)]
+        InsnParser = NSScriptExtendedInstruction if extended else NSScriptInstruction
+        self.instructions: List[NSScriptInstruction] = [
+            InsnParser(reader) for _ in range(self.block_header_entries.size)]
 
         if self.block_header_entries.offset > size:
             raise ValueError(F'Header indicates {self.block_header_entries.size} entries, but only {size} bytes remain.')
@@ -1040,6 +1049,18 @@ class NSHeader(Struct):
                 raise ValueError(F'Duplicate item: {item.path} at 0x{item.offset:08X}')
         
         self.items = [items[t] for t in sorted(items.keys())]
+
+    @property
+    def nsis_deflate(self):
+        return self.type is not NSType.Nsis3
+    
+    @property
+    def encoding(self):
+        return 'utf-16' if self.unicode else 'latin1'
+
+    @property
+    def charsize(self):
+        return 2 if self.unicode else 1
         
 
 
@@ -1078,30 +1099,21 @@ class NSArchive(Struct):
                 F'Header indicates archive size 0x{archive_size:08X}, '
                 F'but only 0x{reader.remaining_bytes:08X} bytes remain.')
     
-        # Prepare to check compression format. This takes
+        
+        
+        # Preview_bytes and preview check will check the compression format. This takes
         # a few bytes and checks the header to determine the format
-        preview_bytes = bytes(reader.peek(4))
-        preview_value = int.from_bytes(preview_bytes, byteorder='little')
         
-        # The default "solid" value is True and default method is deflate.
-        # Regarding Solid:
-        # "If /SOLID is used, all of the installer data is compressed in one block. This results in greater compression ratios."
-        # We determine if the compression is solid or not by checking the headers.
-        # https://nsis.sourceforge.io/Docs/Chapter4.html#
-        
-        self.solid = True
-        self.lzma_options: Optional[LZMAOptions] = None
-        self.method = NSMethod.Deflate
-
         # Header Matching Logic:
         #  X is the header size as given by the first header
         #  T is a value less than 0xE
         #  Y is a value different from 0x80
         # XX XX XX XX __ __ __ __ __ __ __  non-solid, uncompressed
+        # 00 00 00 00 00 00 00 00 XX XX XX XX  non-solid, uncompressed, extended
         # 5D 00 00 DD DD 00 __ __ __ __ __  solid LZMA
         # 00 5D 00 00 DD DD 00 __ __ __ __  solid LZMA, empty filter
         # 01 5D 00 00 DD DD 00 __ __ __ __  solid LZMA, BCJ filter
-         # __ __ __ 80 5D 00 00 DD DD 00 __  non-solid LZMA
+        # __ __ __ 80 5D 00 00 DD DD 00 __  non-solid LZMA
         # __ __ __ 80 00 5D 00 00 DD DD 00  non-solid LZMA, empty filter
         # __ __ __ 80 01 5D 00 00 DD DD 00  non-solid LZMA, BCJ filter
         # __ __ __ 80 01 0T __ __ __ __ __  non-solid BZip
@@ -1110,7 +1122,7 @@ class NSArchive(Struct):
         # __ __ __ YY __ __ __ __ __ __ __  solid Deflate
         
         def lzmacheck(preview):
-            if B'\x5D\0\0' not in preview:
+            if B'\x5D\0\0' not in preview[:4]:
                 return False
             filter_flag = preview_bytes[0] <= 1
             reader.seek_relative(3 + int(filter_flag))
@@ -1120,51 +1132,72 @@ class NSArchive(Struct):
         def bzipcheck(preview):
             return preview[0] == 0x31 and preview[1] < 14
         
-        if preview_value == header_size:
-            self.solid = False
+        preview_bytes = bytes(reader.peek(16))
+        preview_check = preview_bytes.find(header_size.to_bytes(4, byteorder='little'))
+        
+        # The default "solid" value is True and default method is deflate.
+        # Regarding Solid:
+        # "If /SOLID is used, all of the installer data is compressed in one block. This results in greater compression ratios."
+        # We determine if the compression is solid or not by checking the headers.
+        # https://nsis.sourceforge.io/Docs/Chapter4.html#
+        self.solid = True
+        self.extended = False
+        self.lzma_options: Optional[LZMAOptions] = None
+        self.method = NSMethod.Deflate
+        self.entries: Dict[int, bytearray] = {}
+        self.entry_offset_delta = 4
+        self._solid_iter = None
+        if preview_check >= 0:
             header_data_length = header_size
-            reader.seek_relative(4)
-            header_data = reader.read_exactly(header_size)
             self.method = NSMethod.Copy
+            self.solid = False
+            if not preview_check:
+                header_prefix_size = 0x04
+            elif preview_check == 8:
+                header_prefix_size = 0x10
+                self.extended = True
+            else:
+                raise ValueError(F'Invalid header size: 0x{header_size:08X}, unknown NSIS format')
+            reader.seek_relative(header_prefix_size)
+            self.entry_offset_delta = header_prefix_size
+            header_data = reader.read_exactly(header_data_length)
         elif lzmacheck(preview_bytes):
             self.method = NSMethod.LZMA
         elif preview_bytes[3] == 0x80:
             self.solid = False
             reader.seek_relative(4)
-            second_preview = bytes(reader.peek(4))
-            if lzmacheck(second_preview):
+            preview_bytes = bytes(reader.peek(4))
+            if lzmacheck(preview_bytes):
                 self.method = NSMethod.LZMA
-            elif bzipcheck(second_preview):
+            elif bzipcheck(preview_bytes):
                 self.method = NSMethod.BZip2
         elif bzipcheck(preview_bytes):
             self.method = NSMethod.BZip2
 
         reader.seek_set(self.archive_offset)
         self.entries: Dict[int, bytearray] = {}
-        self.entry_offset_delta = 0
-        self._solid_iter = None
+        #self.entry_offset_delta = 0
+        #self._solid_iter = None
 
         if header_data is None:
             item = self._decompress_items(reader)
-            try:
-                header_entry = next(item)
-            except zlib.error as ZLERR:
-                raise NotImplementedError(
+            header_entry = next(item)
+            if header_entry.decompression_failed:
+                raise ValueError(
                     'This archive seems to use an NSIS-specific deflate '
-                    'algorithm which has not been implemented yet.'
-                ) from ZLERR
+                    'algorithm which has not been implemented yet.')
             if self.solid:
                 self._solid_iter = item 
-            self.entry_offset_delta = 4 + header_entry.compressed_size
+            self.entry_offset_delta += header_entry.compressed_size
             header_data = header_entry.data
         else:
-            self.entry_offset_delta = 4 + len(header_data)
+            self.entry_offset_delta += len(header_data)
 
         if not header_data:
             raise ValueError("Empty header")
         logging.debug(F'Header size: 0x{header_size:08X}')
 
-        self.header = NSHeader(header_data, size=header_size)
+        self.header = NSHeader(header_data, size=header_size, extended=self.extended)
         self.reader = reader
         
     @property
@@ -1195,20 +1228,22 @@ class NSArchive(Struct):
             return entry
 
     class SolidReader(Iterable[Entry]):
-        def __init__(self, src: BinaryIO):
+        def __init__(self, src: BinaryIO, prefix_length: int):
             self.src = src
             self.pos = 0
+            self.prefix_length = prefix_length
 
         def __iter__(self):
             return self
         
         def __next__(self):
             offset = self.pos
-            size = self.src.read(4)
-            if len(size) != 4:
+            mask = (1 << ((self.prefix_length * 8) - 1)) - 1
+            size = self.src.read(self.prefix_length)
+            if len(size) != self.prefix_length:
                 raise StopIteration
             size = int.from_bytes(size, byteorder='little')
-            read = size & 0x7FFFFFFF
+            read = size & mask
             data = self.src.read(read)
             if len(data) != read:
                 raise EOFError('Unexpected end of stream while decompressing archive entries.')
@@ -1216,8 +1251,8 @@ class NSArchive(Struct):
             return NSArchive.Entry(offset, data, size)
 
     class PartsReader(SolidReader):
-        def __init__(self, src: BinaryIO, decompressor: Optional[Type[BinaryIO]]):
-            super().__init__(src)
+        def __init__(self, src: BinaryIO, decompressor: Optional[Type[BinaryIO]], prefix_length: int):
+            super().__init__(src, prefix_length)
             self._dc = decompressor
 
         def __next__(self):
@@ -1266,9 +1301,11 @@ class NSArchive(Struct):
             NSMethod.LZMA    : NSISLZMAFile,
             NSMethod.BZip2   : BZip2File,
         }[self.method]
+        prefix_length = 8 if self.extended else 4
         if self.solid:
-            return self.SolidReader(decompressor(reader))
-        return self.PartsReader(reader, decompressor)
+            return self.SolidReader(decompressor(reader), prefix_length)
+        else:
+            return self.PartsReader(reader, decompressor, prefix_length)
         
 
 class extractNSIS(ArchiveUnit):
@@ -1335,20 +1372,18 @@ class extractNSIS(ArchiveUnit):
             else:
                 break
 
-        def info():
-            yield F'{archive.header.type.name} archive'
-            yield F'{archive.method.name.lower()} compression'
-            yield F'Mystery value 0x{archive.header.unknown_value:X}'
-            yield 'solid archive' if archive.solid else 'non-solid archive'
-            yield '64-bit archive' if archive.header.is64bit else '32-bit archive'
-            yield 'unicode' if archive.header.unicode else 'ansi'
+        # def info():
+        #     yield F'{archive.header.type.name} archive'
+        #     yield F'{archive.method.name.lower()} compression'
+        #     yield F'Mystery value 0x{archive.header.unknown_value:X}'
+        #     yield 'solid archive' if archive.solid else 'non-solid archive'
+        #     yield '64-bit archive' if archive.header.is64bit else '32-bit archive'
+        #     yield 'unicode' if archive.header.unicode else 'ansi'
         
-        logging.info(', '.join(info()))
+        # logging.info(', '.join(info()))
         unpacked_items = []
         for item in archive.header.items:
             unpacked_items.append(self._pack(item.path, item.mtime, archive._extract_item_data(item)))
-            #data = archive._extract_item_data(item)
-            logging.info(F'{item.path} at 0x{item.offset:08X}, {len(data)} bytes')
         unpacked_items.append(self._pack('setup.nsis', None, archive.script.encode('utf-8'))) 
         return unpacked_items
 

@@ -5,7 +5,7 @@ from pathlib import Path
 from tkinter import *
 import tkinter.scrolledtext as st
 from typing import Tuple, Optional, Any
-from tkinterdnd2 import DND_FILES, TkinterDnD
+from debloat.tkinterdnd2.tkinterdnd2 import DND_FILES, TkinterDnD
 import pefile
 import debloat.processor
 from debloat.processor import DEBLOAT_VERSION
