@@ -17,7 +17,7 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
 
     - name: Set up Python
       uses: actions/setup-python@v2
@@ -29,24 +29,28 @@ jobs:
         python -m pip install --upgrade pip
         pip install pyinstaller
         pip install -r requirements.txt
+      working-directory: src/debloat
 
     - name: Build executable on Linux
       if: matrix.os == 'ubuntu-latest'
       run: |
         pyinstaller --onefile --noconsole --icon=debloat.ico --collect-all tkinterdnd2 gui.py
+      working-directory: src/debloat
 
     - name: Build executable on macOS
       if: matrix.os == 'macos-latest'
       run: |
         pyinstaller --onefile --noconsole --additional-hooks-dir=./hook --icon=debloat.icns gui.py
+      working-directory: src/debloat
 
     - name: Build executable on Windows
       if: matrix.os == 'windows-latest'
       run: |
         pyinstaller --onefile --noconsole --additional-hooks-dir=./hook --icon=debloat.ico gui.py
+      working-directory: src/debloat
 
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4.3.5
       with:
         name: executable-${{ matrix.os }}
-        path: dist/
+        path: src/debloat/dist/
