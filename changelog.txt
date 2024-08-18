@@ -1,3 +1,11 @@
+1.6.1
+- Fixes legacy bug that could result in failure to identify NSIS installers.
+	- In previous builds, we only checked a small window for the NSIS header. That window has been increased.
+- Updates the tkinterdnd hook file to only collect binaries associated with the operating system it is being built for.
+- Add placeholders for 2 new use cases to solve for.
+- Updates buildCLI.txt to specify output filename.
+- Add file for GitHub build automation.
+
 1.6.0
 - Improves NSIS Parser to handle an irregular NSIS format
 - Adds solution for Use Case 17

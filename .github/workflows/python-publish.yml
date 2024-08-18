@@ -1,0 +1,61 @@
+name: Build Executables
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-13, macos-14, windows-latest]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pyinstaller tkinterdnd2 pefile
+      working-directory: src/debloat
+
+    - name: Build executable on Linux
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        pyinstaller --onefile --noconsole --icon=debloat.ico --collect-all tkinterdnd2 --name debloat gui.py
+      working-directory: src/debloat
+
+    - name: Build executable on macOS
+      if: matrix.os == 'macos-13'
+      run: |
+        pyinstaller --onefile --noconsole --additional-hooks-dir=./hook --icon=debloat.icns --name debloat gui.py
+      working-directory: src/debloat
+
+    - name: Build executable on macOS
+      if: matrix.os == 'macos-14'
+      run: |
+        pyinstaller --onefile --noconsole --additional-hooks-dir=./hook --icon=debloat.icns --name debloat gui.py
+      working-directory: src/debloat
+
+    - name: Build executable on Windows
+      if: matrix.os == 'windows-latest'
+      run: |
+        pyinstaller --onefile --noconsole --additional-hooks-dir=./hook --icon=debloat.ico --name debloat gui.py
+      working-directory: src/debloat
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: executable-${{ matrix.os }}
+        path: src/debloat/dist/

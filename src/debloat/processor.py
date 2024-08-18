@@ -43,6 +43,8 @@ RESULT_CODES = {
     15: "VMProtected junk",
     16: "InnoSetup Installer",
     17: "Junk in the certificate",
+    18: "SFX Archive",
+    19: "Electron Application"
 }
 
 
@@ -533,7 +535,7 @@ def process_pe(pe: pefile.PE, out_path: str, last_ditch_processing: bool,
         pass
     # Handle Overlays: this includes packers and overlays which are completely junk
     elif pe.get_overlay_data_start_offset() and signature_size < len(pe.__data__) - pe.get_overlay_data_start_offset():
-        possible_header = pe.__data__[pe.get_overlay_data_start_offset():pe.get_overlay_data_start_offset() + 30]
+        possible_header = pe.__data__[pe.get_overlay_data_start_offset():pe.get_overlay_data_start_offset() + 20_000]
         # Check first to see if the file is NSIS
         nsis_extracted = check_and_extract_NSIS(possible_header, pe)
         if nsis_extracted:

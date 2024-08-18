@@ -1353,7 +1353,8 @@ class extractNSIS(ArchiveUnit):
         if best_guess:
             message = F'Archive signature was found at offset 0x{best_guess:08X}, but it has too many flaws to be reliable.'
             logging.debug(message)
-        return best_guess
+            return best_guess
+        return None
 
     def unpack(self, data: memoryview):
         memory = memoryview(data)

@@ -1,8 +1,8 @@
 MacOS
-pyinstaller --onefile --noconsole --additional-hooks-dir=./hook --icon=debloat.icns gui.py
+pyinstaller --onefile --noconsole --additional-hooks-dir=./hook --icon=debloat.icns --name debloat gui.py
 
 Windows
-pyinstaller --onefile  --noconsole  --additional-hooks-dir=./hook --icon=debloat.ico gui.py
+pyinstaller --onefile  --noconsole  --additional-hooks-dir=./hook --icon=debloat.ico --name debloat gui.py
 
 Linux
-pyinstaller --onefile --noconsole --icon=debloat.ico --collect-all tkinterdnd2 gui.py
+pyinstaller --onefile --noconsole --icon=debloat.ico --collect-all tkinterdnd2 --name debloat gui.py
