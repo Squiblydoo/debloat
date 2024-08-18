@@ -37,7 +37,13 @@ jobs:
       working-directory: src/debloat
 
     - name: Build executable on macOS
-      if: matrix.os == 'macos-latest'
+      if: matrix.os == 'macos-13'
+      run: |
+        pyinstaller --onefile --noconsole --additional-hooks-dir=./hook --icon=debloat.icns --name debloat gui.py
+      working-directory: src/debloat
+
+    - name: Build executable on macOS
+      if: matrix.os == 'macos-14'
       run: |
         pyinstaller --onefile --noconsole --additional-hooks-dir=./hook --icon=debloat.icns --name debloat gui.py
       working-directory: src/debloat
