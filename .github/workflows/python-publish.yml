@@ -36,14 +36,8 @@ jobs:
         pyinstaller --onefile --noconsole --icon=debloat.ico --collect-all tkinterdnd2 --name debloat gui.py
       working-directory: src/debloat
 
-    - name: Build executable on macOS
-      if: matrix.os == 'macos-13'
-      run: |
-        pyinstaller --onefile --noconsole --additional-hooks-dir=./hook --icon=debloat.icns --name debloat gui.py
-      working-directory: src/debloat
-
-    - name: Build executable on macOS
-      if: matrix.os == 'macos-14'
+    - name: Build executable on macOS (Intel and ARM)
+      if: startsWith(matrix.os, 'macos')
       run: |
         pyinstaller --onefile --noconsole --additional-hooks-dir=./hook --icon=debloat.icns --name debloat gui.py
       working-directory: src/debloat
@@ -54,8 +48,41 @@ jobs:
         pyinstaller --onefile --noconsole --additional-hooks-dir=./hook --icon=debloat.ico --name debloat gui.py
       working-directory: src/debloat
 
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v2
+    - name: Set output name
+      id: set-tar-name
+      if: startsWith(matrix.os, 'ubuntu') || startsWith(matrix.os, 'macos')
+      run: echo "TAR_NAME=debloat.tar" >> $GITHUB_ENV
+      
+    - name: 'Tar files'
+      if: startsWith(matrix.os, 'ubuntu') || startsWith(matrix.os, 'macos')
+      run: |
+        cd src/debloat/dist/ &&
+        tar -cf ${{ env.TAR_NAME}} *
+
+    - name: Upload Linux build artifacts
+      uses: actions/upload-artifact@v4
+      if: startsWith(matrix.os, 'ubuntu')
       with:
-        name: executable-${{ matrix.os }}
+        name: Linux_debloat
+        path: src/debloat/dist/${{ env.TAR_NAME }}
+
+    - name: Upload Intel Mac build artifacts
+      uses: actions/upload-artifact@v4
+      if: matrix.os == 'macos-13'
+      with:
+        name: macOS_x86_intel_debloat
+        path: src/debloat/dist/${{ env.TAR_NAME }}
+
+    - name: Upload ARM Mac build artifacts
+      uses: actions/upload-artifact@v4
+      if: matrix.os == 'macos-14'
+      with:
+        name: macOS_ARM_debloat
+        path: src/debloat/dist/${{ env.TAR_NAME }}
+
+    - name: Upload Windows build artifacts
+      uses: actions/upload-artifact@v4
+      if: startsWith(matrix.os, 'windows') 
+      with:
+        name: ${{ matrix.os }}_debloat
         path: src/debloat/dist/
