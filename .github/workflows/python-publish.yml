@@ -61,13 +61,15 @@ jobs:
       
     - name: 'Tar files'
       if: startsWith(matrix.os, 'ubuntu') || startsWith(matrix.os, 'macos')
-      run: tar -cf src/debloat/dist/${{ env.TAR_NAME}} src/debloat/dist/
+      run: |
+        cd src/debloat/dist/ &&
+        tar -cf ${{ env.TAR_NAME}} *
 
-    - name: Upload Linux and Mac build artifacts
+    - name: Upload Linux build artifacts
       uses: actions/upload-artifact@v4
-      if: startsWith(matrix.os, 'ubuntu') || startsWith(matrix.os, 'macos')
+      if: startsWith(matrix.os, 'ubuntu')
       with:
-        name: ${{ matrix.os }}_debloat
+        name: Linux_debloat
         path: src/debloat/dist/${{ env.TAR_NAME }}
 
     - name: Upload Intel Mac build artifacts
