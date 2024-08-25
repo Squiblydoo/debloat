@@ -61,14 +61,28 @@ jobs:
       
     - name: 'Tar files'
       if: startsWith(matrix.os, 'ubuntu') || startsWith(matrix.os, 'macos')
-      run: tar -cf ${{ env.TAR_NAME}} src/debloat/dist/
+      run: tar -cf src/debloat/dist/${{ env.TAR_NAME}} src/debloat/dist/
 
     - name: Upload Linux and Mac build artifacts
       uses: actions/upload-artifact@v4
       if: startsWith(matrix.os, 'ubuntu') || startsWith(matrix.os, 'macos')
       with:
         name: ${{ matrix.os }}_debloat
-        path: ${{ env.TAR_NAME }}
+        path: src/debloat/dist/${{ env.TAR_NAME }}
+
+    - name: Upload Intel Mac build artifacts
+      uses: actions/upload-artifact@v4
+      if: matrix.os == 'macos-13'
+      with:
+        name: macOS_x86_intel_debloat
+        path: src/debloat/dist/${{ env.TAR_NAME }}
+
+    - name: Upload ARM Mac build artifacts
+      uses: actions/upload-artifact@v4
+      if: matrix.os == 'macos-14'
+      with:
+        name: macOS_ARM_debloat
+        path: src/debloat/dist/${{ env.TAR_NAME }}
 
     - name: Upload Windows build artifacts
       uses: actions/upload-artifact@v4
