@@ -68,11 +68,11 @@ jobs:
       if: startsWith(matrix.os, 'ubuntu') || startsWith(matrix.os, 'macos')
       with:
         name: ${{ matrix.os }}_debloat
-        path: src/debloat/dist/${{ env.TAR_NAME }}
+        path: ${{ env.TAR_NAME }}
 
     - name: Upload Windows build artifacts
       uses: actions/upload-artifact@v4
-      if: startsWith(matrix.os, 'ubuntu') || startsWith(matrix.os, 'macos')
+      if: startsWith(matrix.os, 'windows') 
       with:
         name: ${{ matrix.os }}_debloat
         path: src/debloat/dist/
