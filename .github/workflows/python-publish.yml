@@ -54,8 +54,15 @@ jobs:
         pyinstaller --onefile --noconsole --additional-hooks-dir=./hook --icon=debloat.ico --name debloat gui.py
       working-directory: src/debloat
 
+    - name: 'Tar files'
+      run: tar -cf ${{ matrix.os }}.tar src/debloat/dist/
+
+    - name: Set output name
+      id: set-tar-name
+      run: echo "::set-output name=tar_name::${{ matrix.os }}.tar"
+
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
-        name: executable-${{ matrix.os }}
-        path: src/debloat/dist/
+        name: ${{ matrix.os }}_debloat
+        path: src/debloat/dist/${{ steps.set-tar-name.outputs.tar_name }}
