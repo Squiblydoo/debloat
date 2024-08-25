@@ -54,15 +54,25 @@ jobs:
         pyinstaller --onefile --noconsole --additional-hooks-dir=./hook --icon=debloat.ico --name debloat gui.py
       working-directory: src/debloat
 
-    - name: 'Tar files'
-      run: tar -cf ${{ matrix.os }}.tar src/debloat/dist/
-
     - name: Set output name
       id: set-tar-name
-      run: echo "::set-output name=tar_name::${{ matrix.os }}.tar"
+      if: startsWith(matrix.os, 'ubuntu') || startsWith(matrix.os, 'macos')
+      run: echo "TAR_NAME=${{ matrix.os }}.tar" >> $GITHUB_ENV
+      
+    - name: 'Tar files'
+      if: startsWith(matrix.os, 'ubuntu') || startsWith(matrix.os, 'macos')
+      run: tar -cf ${{ env.TAR_NAME}} src/debloat/dist/
 
-    - name: Upload build artifacts
+    - name: Upload Linux and Mac build artifacts
       uses: actions/upload-artifact@v4
+      if: startsWith(matrix.os, 'ubuntu') || startsWith(matrix.os, 'macos')
       with:
         name: ${{ matrix.os }}_debloat
-        path: src/debloat/dist/${{ steps.set-tar-name.outputs.tar_name }}
+        path: src/debloat/dist/${{ env.TAR_NAME }}
+
+    - name: Upload Windows build artifacts
+      uses: actions/upload-artifact@v4
+      if: startsWith(matrix.os, 'ubuntu') || startsWith(matrix.os, 'macos')
+      with:
+        name: ${{ matrix.os }}_debloat
+        path: src/debloat/dist/
