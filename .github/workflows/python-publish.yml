@@ -36,14 +36,8 @@ jobs:
         pyinstaller --onefile --noconsole --icon=debloat.ico --collect-all tkinterdnd2 --name debloat gui.py
       working-directory: src/debloat
 
-    - name: Build executable on macOS
-      if: matrix.os == 'macos-13'
-      run: |
-        pyinstaller --onefile --noconsole --additional-hooks-dir=./hook --icon=debloat.icns --name debloat gui.py
-      working-directory: src/debloat
-
-    - name: Build executable on macOS
-      if: matrix.os == 'macos-14'
+    - name: Build executable on macOS (Intel and ARM)
+      if: startsWith(matrix.os, 'macos')
       run: |
         pyinstaller --onefile --noconsole --additional-hooks-dir=./hook --icon=debloat.icns --name debloat gui.py
       working-directory: src/debloat
@@ -57,7 +51,7 @@ jobs:
     - name: Set output name
       id: set-tar-name
       if: startsWith(matrix.os, 'ubuntu') || startsWith(matrix.os, 'macos')
-      run: echo "TAR_NAME=${{ matrix.os }}.tar" >> $GITHUB_ENV
+      run: echo "TAR_NAME=debloat.tar" >> $GITHUB_ENV
       
     - name: 'Tar files'
       if: startsWith(matrix.os, 'ubuntu') || startsWith(matrix.os, 'macos')
