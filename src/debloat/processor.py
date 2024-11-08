@@ -365,6 +365,8 @@ def get_compressed_size(data: memoryview, offset: int, level: int = -1):
 
 def check_section_compression(pe: pefile.PE, data_to_delete: List,
                               log_message: Callable[[str], None]) -> Tuple[pefile.PE, int, str]:
+def check_section_compression(pe: pefile.PE, data_to_delete: List,
+                              log_message: Callable[[str], None]) -> Tuple[pefile.PE, int, str]:
         biggest_section = None
         biggest_uncompressed = int
         result = ""
@@ -415,6 +417,12 @@ The compression ratio of ''' + biggest_section.Name.decode("utf8", errors="backs
                 log_message("Section was not able to be reduced.")
                 result_code = 0
                 return result, result_code
+            data_to_delete.append((biggest_section.PointerToRawData + delta_last_non_junk, biggest_section_end))
+            
+            # Update the SizeOfRawData for the biggest section
+            biggest_section.SizeOfRawData = delta_last_non_junk
+            
+            section_bytes_to_remove = original_section_size - delta_last_non_junk
             data_to_delete.append((biggest_section.PointerToRawData + delta_last_non_junk, biggest_section_end))
             
             section_bytes_to_remove = original_section_size - delta_last_non_junk
