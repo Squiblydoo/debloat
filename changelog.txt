@@ -1,3 +1,7 @@
+1.6.2
+- Fixes bug in adjust_offsets method that impacted tactic-7. Bug was introduced in 1.5.6.4 as a bad attempt at error handling.
+	- When adjusting offsets, it was possible for an error to be thrown because adjusting the offset would set it to an invalid value. However, this would happen because the value was invalid to begin with. The incorrect value was being improperly handled. I'm not 100% sure that I have it correct, but the new change works as expected.
+
 1.6.1
 - Fixes legacy bug that could result in failure to identify NSIS installers.
 	- In previous builds, we only checked a small window for the NSIS header. That window has been increased.

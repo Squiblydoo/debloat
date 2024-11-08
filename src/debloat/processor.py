@@ -22,7 +22,7 @@ from typing import Generator, Iterable, Optional
 import debloat.utilities.nsisParser as nsisParser
 import debloat.utilities.rsrc as rsrc
 
-DEBLOAT_VERSION = "1.6.0"
+DEBLOAT_VERSION = "1.6.2"
 
 RESULT_CODES = {
     0: "No Solution found.",
@@ -235,7 +235,6 @@ def adjust_offsets(pe: pefile.PE, gap_offset: int, gap_size: int):
                 'PointerToRawData',
             ))
         except Exception as e:
-            remove.append(index)
             continue
 
         for attribute in (
