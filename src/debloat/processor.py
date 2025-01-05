@@ -22,7 +22,7 @@ from typing import Generator, Iterable, Optional
 import debloat.utilities.nsisParser as nsisParser
 import debloat.utilities.rsrc as rsrc
 
-DEBLOAT_VERSION = "1.6.2"
+DEBLOAT_VERSION = "1.6.3"
 
 RESULT_CODES = {
     0: "No Solution found.",
@@ -545,6 +545,9 @@ def process_pe(pe: pefile.PE, out_path: str, last_ditch_processing: bool,
         else:
             log_message("Attempting dynamic trim...")
             last_section = find_last_section(pe)
+            if last_section is None:
+                log_message("Unable to process. This may indicate the file is malformed.")
+                return 0
             overlay = memoryview(pe.__data__)[last_section.PointerToRawData + last_section.SizeOfRawData:signature_address or beginning_file_size]
             
             # The following checks a sample of the overlay to determine if it will be able to be removed.
