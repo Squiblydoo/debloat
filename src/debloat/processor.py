@@ -530,7 +530,7 @@ def process_pe(pe: pefile.PE, out_path: str, last_ditch_processing: bool,
                                                         signature_size,
                                                         beginning_file_size,
                                                         data_to_delete)
-    if signature_abnormality is True:
+    if signature_abnormality is True and sum(slice_end-slice_start for slice_start, slice_end in data_to_delete) >= (beginning_file_size * 0.1):
         pass
     # Handle Overlays: this includes packers and overlays which are completely junk
     elif pe.get_overlay_data_start_offset() and signature_size < len(pe.__data__) - pe.get_overlay_data_start_offset():
