@@ -1,3 +1,6 @@
+1.6.4
+- Added an additional check to identify the Code-signing signature anomaly. This check previously exited if the anomaly was found but it did not check to determine if enough of the file was removed. Now a size check has been added in order to determine if additional processing is required. 
+
 1.6.3
 - Fixes bug where debloat failed to handle malformed files. 
 
