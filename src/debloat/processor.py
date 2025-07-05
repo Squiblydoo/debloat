@@ -22,7 +22,7 @@ from typing import Generator, Iterable, Optional
 import debloat.utilities.nsisParser as nsisParser
 import debloat.utilities.rsrc as rsrc
 
-DEBLOAT_VERSION = "1.6.4"
+DEBLOAT_VERSION = "1.6.5"
 
 RESULT_CODES = {
     0: "No Solution found.",
