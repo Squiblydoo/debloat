@@ -1,3 +1,8 @@
+1.6.5
+- Fixed bug introduced in 1.6.1 which consistently resulted in failure to parse NSIS installers.
+- Updated NSIS extraction script to include new functionality from BinaryRefinery
+- Removed use of ByteString which was removed in python3.14
+
 1.6.4
 - Added an additional check to identify the Code-signing signature anomaly. This check previously exited if the anomaly was found but it did not check to determine if enough of the file was removed. Now a size check has been added in order to determine if additional processing is required. 
 

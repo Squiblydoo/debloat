@@ -19,7 +19,7 @@ from datetime import datetime
 
 import logging
 from debloat.utilities.readers import StructReader, Struct, StreamDetour, MemoryFile
-from debloat.utilities.pyflate import BZip2File
+from debloat.utilities.pyflate import BZip2File, GZipFile
 from typing import (
     BinaryIO, 
     NamedTuple, 
@@ -27,7 +27,6 @@ from typing import (
     Iterator, 
     Callable, 
     Union, 
-    ByteString, 
     Optional, 
     List, 
     Dict,
@@ -37,12 +36,12 @@ logging.basicConfig(level=logging.WARN)
 
 class UnpackResult:
 
-    def get_data(self) -> ByteString:
+    def get_data(self) -> Union[bytes, bytearray, memoryview]:
         if Callable(self.data):
             self.data = self.data()
         return self.data
 
-    def __init__(self, _br__path: str, _br__data: Union[ByteString, Callable[[], ByteString]], **_br__meta):
+    def __init__(self, _br__path: str, _br__data: Union[Union[bytes, bytearray, memoryview], Callable[[], Union[bytes, bytearray, memoryview]]], **_br__meta):
         self.path = _br__path
         self.data = _br__data
         self.meta = _br__meta
@@ -71,7 +70,7 @@ class ArchiveUnit:
         self,
         path: str,
         date: Optional[Union[datetime, str]],
-        data: Union[ByteString, Callable[[], ByteString]],
+        data: Union[Union[bytes, bytearray, memoryview], Callable[[], Union[bytes, bytearray, memoryview]]],
         **meta
     ) -> UnpackResult:
         if isinstance(date, datetime):
@@ -133,6 +132,7 @@ class NSMethod(str, enum.Enum):
     LZMA = 'LZMA'
     BZip2 = 'BZIP2'
     Deflate = 'DEFLATE'
+    NSGzip = 'NsisGzip'
 
 class Op(enum.IntEnum):
     INVALID_OPCODE     = 0              # noqa
@@ -1199,6 +1199,9 @@ class NSArchive(Struct):
 
         self.header = NSHeader(header_data, size=header_size, extended=self.extended)
         self.reader = reader
+
+        if self.method is NSMethod.Deflate and self.header.nsis_deflate:
+            self.method = NSMethod.NSGzip
         
     @property
     def script(self):
@@ -1247,7 +1250,7 @@ class NSArchive(Struct):
             data = self.src.read(read)
             if len(data) != read:
                 raise EOFError('Unexpected end of stream while decompressing archive entries.')
-            self.pos = offset + size + 4
+            self.pos = offset + read + 4
             return NSArchive.Entry(offset, data, size)
 
     class PartsReader(SolidReader):
@@ -1294,10 +1297,33 @@ class NSArchive(Struct):
     def _decompress_items(self, reader: StructReader[bytearray]) -> Iterator[Entry]:
         """ Decompresses the items in the archive. """
         def NSISLZMAFile(d):
-            return lzma.LZMAFile(self.LZMAFix(d))
+            if use_filter := self.lzma_options.filter_flag:
+                use_filter = d.u8()
+            if use_filter > 1:
+                raise ValueError(F'LZMA/BCJ chunk with invalid filter indicator byte 0x{use_filter:X}')
+            if not use_filter:
+                _filter = None
+                _format = None
+                _stream = self.LZMAFix(d)
+            else:
+                pv = d.u8()
+                ds = max(self.lzma_options.dictionary_size, d.u32())
+                if (pv >= 225):
+                    raise ValueError('Unexpected LZMA properties; value exceeds 225.')
+                pv, lc = divmod(pv, 9)
+                pb, lp = divmod(pv, 5)
+                _filter = [
+                    dict(id=lzma.FILTER_X86),
+                    dict(id=lzma.FILTER_LZMA1, dict_size=ds, lc=lc, lp=lp, pb=pb)]
+                _format = lzma.FORMAT_RAW
+                _stream = d
+
+            return lzma.LZMAFile(_stream, filters=_filter, format=_format)
+            
         decompressor: Type[BinaryIO]= {
             NSMethod.Copy    : None,
             NSMethod.Deflate : DeflateFile,
+            NSMethod.NSGzip  : GZipFile,
             NSMethod.LZMA    : NSISLZMAFile,
             NSMethod.BZip2   : BZip2File,
         }[self.method]
@@ -1353,8 +1379,8 @@ class extractNSIS(ArchiveUnit):
         if best_guess:
             message = F'Archive signature was found at offset 0x{best_guess:08X}, but it has too many flaws to be reliable.'
             logging.debug(message)
-            return best_guess
-        return None
+        return best_guess
+        
 
     def unpack(self, data: memoryview):
         memory = memoryview(data)

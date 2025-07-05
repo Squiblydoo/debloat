@@ -10,7 +10,7 @@ import struct
 import re
 import functools
 from types import TracebackType
-from typing import List, Union, Tuple, Optional, Iterable, ByteString, TypeVar, Generic, Any, Dict
+from typing import List, Union, Tuple, Optional, Iterable, TypeVar, Generic, Any
 
 T = TypeVar('T', bound=Union[bytearray, bytes, memoryview])
 UnpackType = Union[int, bool, float, bytes]
@@ -19,6 +19,17 @@ def signed(k: int, bits: int):
     M = 1 << bits
     k = k & (M - 1)
     return k - M if k >> (bits - 1) else k
+
+def exception_to_string(exception: BaseException, default=None) -> str:
+    """
+    Attempts to convert a given exception to a good description that can be exposed to the user.
+    """
+    if not exception.args:
+        return exception.__class__.__name__
+    it = (a for a in exception.args if isinstance(a, str))
+    if default is None:
+        default = str(exception)
+    return max(it, key=len, default=default).strip()
 
 class StreamDetour:
     def __init__(self, stream: io.IOBase, 
@@ -205,7 +216,7 @@ class MemoryFile(Generic[T], io.IOBase):
         self._cursor = max(0, min(self._cursor, len(self._data)))
         return self._cursor
     
-    def write_lines(self, lines: Iterable[ByteString]) -> None:
+    def write_lines(self, lines: Iterable[Union[bytes, bytearray, memoryview]]) -> None:
         for line in lines:
             self.append(line)
 
@@ -599,6 +610,6 @@ class Struct(metaclass=StructMeta):
 
 
 class EOF(EOFError):
-    def __init__(self, rest: ByteString = B''):
+    def __init__(self, rest: Union[bytes, bytearray, memoryview] = b''):
         super().__init__('End of File')
         self.rest = rest
