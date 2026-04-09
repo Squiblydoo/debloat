@@ -1,4 +1,5 @@
 """This file handles all GUI components."""
+import logging
 import os
 import time
 from pathlib import Path 
@@ -105,6 +106,7 @@ with an executable. Maybe it needs unzipped?''')
         self.clear_pathbox()
 
 def main() -> None:
+    logging.basicConfig(level=logging.WARN)
     root = MainWindow()
     root.mainloop()
 
