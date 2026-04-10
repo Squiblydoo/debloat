@@ -1,4 +1,5 @@
 """This file handles passing the CLI arguments into the processor"""
+import logging
 import os
 import sys
 from pathlib import Path
@@ -10,6 +11,7 @@ from debloat.processor import RESULT_CODES
 
 
 def main() -> int:
+    logging.basicConfig(level=logging.WARN)
     parser = argparse.ArgumentParser()
     parser.add_argument("executable", 
                         help="Path to the executable to be debloated",

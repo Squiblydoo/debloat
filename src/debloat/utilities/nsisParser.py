@@ -32,8 +32,6 @@ from typing import (
     Dict,
     Type)
 
-logging.basicConfig(level=logging.WARN)
-
 class UnpackResult:
 
     def get_data(self) -> Union[bytes, bytearray, memoryview]:
