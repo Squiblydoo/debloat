@@ -26,10 +26,18 @@ def main() -> int:
     whole PE Overlay as a last resort if no smarter method works.
                             """,
                         action='store_true', default=False)
-    parser.add_argument("-c", "--cert", dest="cert_preservation", 
+    parser.add_argument("-c", "--cert", dest="cert_preservation",
                         help="""
     Preserve the certificate on the end of the file if there is a certificate.
     The certificate will no longer be valid.""",
+                        action='store_true',
+                        required=False,
+                        default=False)
+    parser.add_argument("--no-extract", dest="no_extract",
+                        help="""
+    Do not extract embedded installer files (NSIS).
+    If the file is an installer, the overlay will be trimmed instead.
+                        """,
                         action='store_true',
                         required=False,
                         default=False)
@@ -55,12 +63,13 @@ Maybe it needs unzipped?'''
               )
         return 1
 
-    result_code = debloat.processor.process_pe(pe, 
-                        out_path=str(out_path), 
+    result_code = debloat.processor.process_pe(pe,
+                        out_path=str(out_path),
                         last_ditch_processing=args.last_ditch_processing,
                         cert_preservation=args.cert_preservation,
                         log_message=print,
-                        beginning_file_size=file_size
+                        beginning_file_size=file_size,
+                        extract=not args.no_extract
                         )
     print("Tactic identifed:", RESULT_CODES.get(result_code))
     return 0

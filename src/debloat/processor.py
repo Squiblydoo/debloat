@@ -446,7 +446,7 @@ def find_chunk_start(targeted_regex, chunk_start, original_size_with_junk, bloat
     return chunk_start
 
 def trim_junk(pe: pefile.PE, bloated_content: memoryview,
-              original_size_with_junk: int) -> int:
+              original_size_with_junk: int) -> tuple[int, int]:
     '''Attempts multiple methods to trim junk from the end of a section.'''
     alignment = pe.OPTIONAL_HEADER.FileAlignment
 
@@ -508,7 +508,7 @@ def trim_junk(pe: pefile.PE, bloated_content: memoryview,
 
 def process_pe(pe: pefile.PE, out_path: str, last_ditch_processing: bool,
                 cert_preservation: bool,log_message: Callable[[str], None], 
-                beginning_file_size: int = 0) -> None:
+                beginning_file_size: int = 0, extract: bool = True) -> int:
     '''Prepare PE, perform checks, remote junk, write patched binary.'''
     result_code = 0
     if not beginning_file_size:
@@ -536,56 +536,56 @@ def process_pe(pe: pefile.PE, out_path: str, last_ditch_processing: bool,
     elif pe.get_overlay_data_start_offset() and signature_size < len(pe.__data__) - pe.get_overlay_data_start_offset():
         possible_header = pe.__data__[pe.get_overlay_data_start_offset():pe.get_overlay_data_start_offset() + 20_000]
         # Check first to see if the file is NSIS
-        nsis_extracted = check_and_extract_NSIS(possible_header, pe)
-        if nsis_extracted:
-            write_multiple_files(out_path, nsis_extracted, log_message)
-            result_code = 5 # NSIS Installer
-            return result_code
+        if extract:
+            nsis_extracted = check_and_extract_NSIS(possible_header, pe)
+            if nsis_extracted:
+                write_multiple_files(out_path, nsis_extracted, log_message)
+                result_code = 5 # NSIS Installer
+                return result_code
 
-        else:
-            log_message("Attempting dynamic trim...")
-            last_section = find_last_section(pe)
-            if last_section is None:
-                log_message("Unable to process. This may indicate the file is malformed.")
-                return 0
-            overlay = memoryview(pe.__data__)[last_section.PointerToRawData + last_section.SizeOfRawData:signature_address or beginning_file_size]
+        log_message("Attempting dynamic trim...")
+        last_section = find_last_section(pe)
+        if last_section is None:
+            log_message("Unable to process. This may indicate the file is malformed.")
+            return 0
+        overlay = memoryview(pe.__data__)[last_section.PointerToRawData + last_section.SizeOfRawData:signature_address or beginning_file_size]
+        
+        # The following checks a sample of the overlay to determine if it will be able to be removed.
+        overlay_compression_sample = get_compressed_size(memoryview(overlay)[-2000:], 2000)
+        sample_compression = beginning_file_size / overlay_compression_sample 
+        file_size_wo_overlay = len(memoryview(pe.__data__)[:last_section.PointerToRawData + last_section.SizeOfRawData])
+        if sample_compression > 400000:
+            required_data_from_overlay, result_code = trim_junk(pe, overlay, beginning_file_size)
+            end_of_real_data = file_size_wo_overlay + required_data_from_overlay
+            data_to_delete.append(((file_size_wo_overlay + required_data_from_overlay), beginning_file_size ))
             
-            # The following checks a sample of the overlay to determine if it will be able to be removed.
-            overlay_compression_sample = get_compressed_size(memoryview(overlay)[-2000:], 2000)
-            sample_compression = beginning_file_size / overlay_compression_sample 
-            file_size_wo_overlay = len(memoryview(pe.__data__)[:last_section.PointerToRawData + last_section.SizeOfRawData])
-            if sample_compression > 400000:
-                required_data_from_overlay, result_code = trim_junk(pe, overlay, beginning_file_size)
-                end_of_real_data = file_size_wo_overlay + required_data_from_overlay
-                data_to_delete.append(((file_size_wo_overlay + required_data_from_overlay), beginning_file_size ))
-                
+        else:
+            result, result_code = check_section_compression(pe, data_to_delete, log_message=log_message)
+            if len(data_to_delete) == 1:
+                end_of_real_data = beginning_file_size
             else:
-                result, result_code = check_section_compression(pe, data_to_delete, log_message=log_message)
-                if len(data_to_delete) == 1:
-                    end_of_real_data = beginning_file_size
-                else:
-                    result_code = 12 # Packed with junk in section
-                    end_of_real_data = beginning_file_size - sum(slice_end-slice_start for slice_start, slice_end in data_to_delete)
+                result_code = 12 # Packed with junk in section
+                end_of_real_data = beginning_file_size - sum(slice_end-slice_start for slice_start, slice_end in data_to_delete)
 
-            if end_of_real_data > beginning_file_size * 0.9:
-                if last_ditch_processing is True:
-                    log_message("""
+        if end_of_real_data > beginning_file_size * 0.9:
+            if last_ditch_processing is True:
+                log_message("""
 "Last ditch" switch detected. Running last ditch debloat technique:\n
 This is the last resort that removes the whole overlay: this works in cases where the overlay lacks a pattern.
 However, if the file does not run after this, it is in indicator that this method removed critical data.
-                    """)
-                    end_of_real_data = last_section.PointerToRawData + last_section.SizeOfRawData
-                    data_to_delete.append((end_of_real_data, beginning_file_size))
-                else:
-                    log_message("""
+                """)
+                end_of_real_data = last_section.PointerToRawData + last_section.SizeOfRawData
+                data_to_delete.append((end_of_real_data, beginning_file_size))
+            else:
+                log_message("""
 Overlay was unable to be trimmed. Try unpacking with UniExtract2 or re-running
 Debloat with the "--last-ditch" parameter."""
-                                )
-            elif result_code == 12:
-                # The end was already determined and no more data needs to be removed.
-                pass
-            else:
-                data_to_delete.append((end_of_real_data, beginning_file_size))
+                            )
+        elif result_code == 12:
+            # The end was already determined and no more data needs to be removed.
+            pass
+        else:
+            data_to_delete.append((end_of_real_data, beginning_file_size))
     # Handle bloated sections
     # TODO: break up into functions
     else:
