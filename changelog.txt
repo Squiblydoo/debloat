@@ -1,3 +1,8 @@
+1.7.0
+- Added "--no-extract" argument to the main processor. Default is True.
+	- This allows for systems that only want to return 1 file to not extract installers which would return multiple.
+	- This also further enables debloat to add more installer extraction capabilities.
+
 1.6.6
 - Logging was called in the NSIS parser for historical reasons. The call was moved to main.py/gui.py to resolve downstream problems.
 
