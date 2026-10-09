@@ -44,10 +44,16 @@ class MainWindow(TkinterDnD.Tk):
         self.unsafe_checkbox.pack()
 
         self.cert_preservation = BooleanVar(value=False)
-        self.cert_checkbox = Checkbutton(self, 
+        self.cert_checkbox = Checkbutton(self,
                                         text="Preserve Cert. Cert will be invalid but informational.",
                                         variable=self.cert_preservation)
         self.cert_checkbox.pack()
+
+        self.extract = BooleanVar(value=True)
+        self.extract_checkbox = Checkbutton(self,
+                                            text="Extract files from installers (NSIS)",
+                                            variable=self.extract)
+        self.extract_checkbox.pack()
 
         
 
@@ -95,11 +101,12 @@ with an executable. Maybe it needs unzipped?''')
         out_path = file_path.parent \
             / f"{file_path.stem}_patched{file_path.suffix}"
 
-        result_code = debloat.processor.process_pe(pe,  out_path, 
-                                     self.unsafe_processing.get(), 
+        result_code = debloat.processor.process_pe(pe,  out_path,
+                                     self.unsafe_processing.get(),
                                      self.cert_preservation.get(),
                    log_message=self.output_scrollbox_handler,
-                   beginning_file_size=file_size)
+                   beginning_file_size=file_size,
+                   extract=self.extract.get())
         self.output_scrollbox_handler("Tactic identified: " , RESULT_CODES.get(result_code) +"\n")
         self.output_scrollbox_handler("-----Processing took %s seconds ---\n" \
                                     % round((time.time() - start_time), 2))
