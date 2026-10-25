@@ -1,3 +1,7 @@
+1.7.1
+- Updated build hook 
+	- 1.7.0 failed on systems where Tcl9 was used. New hook looks for Tcl9 and OS more specifically to resolve the problem.
+
 1.7.0
 - Added "--no-extract" argument to the main processor. Default is True.
 	- This allows for systems that only want to return 1 file to not extract installers which would return multiple.
