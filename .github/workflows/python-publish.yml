@@ -66,13 +66,6 @@ jobs:
         name: Linux_debloat
         path: src/debloat/dist/${{ env.TAR_NAME }}
 
-    - name: Upload Intel Mac build artifacts
-      uses: actions/upload-artifact@v4
-      if: matrix.os == 'macos-13'
-      with:
-        name: macOS_x86_intel_debloat
-        path: src/debloat/dist/${{ env.TAR_NAME }}
-
     - name: Upload ARM Mac build artifacts
       uses: actions/upload-artifact@v4
       if: matrix.os == 'macos-14'
