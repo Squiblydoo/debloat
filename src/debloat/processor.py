@@ -69,8 +69,14 @@ def write_multiple_files(out_path: str,
     '''
     log_message("Installer unpacked!\n")
     log_message(f"The files are being written to {out_path}")
+    out_base_path = Path(out_path).resolve()
     for file in files:
-        out_file_path = Path(out_path) / Path(file.path.replace("\\", "/"))
+        out_file_path = (out_base_path / Path(file.path.replace("\\", "/"))).resolve()
+        try:
+            out_file_path.relative_to(out_base_path)
+        except ValueError:
+            log_message(f"Skipping file with unsafe path outside {out_path}: {file.path}")
+            continue
         out_dir_path = out_file_path.parent
         out_dir_path.mkdir(parents=True, exist_ok=True)
         with open(out_file_path, "wb") as f:
